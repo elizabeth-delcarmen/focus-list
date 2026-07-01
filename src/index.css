@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+
+  --color-bg: #faf8f3;
+  --color-surface: #ffffff;
+  --color-surface-raised: #f1eee5;
+  --color-border: #e1dccf;
+  --color-text-primary: #211e19;
+  --color-text-muted: #6e6a5e;
+  --color-text-faint: #9a9587;
+  --color-accent: #7c3b6b;
+  --color-accent-soft: #7c3b6b14;
+  --color-accent-bright: #b26a9e;
+  --color-urgent: #c0463f;
+  --color-urgent-bg: #c0463f16;
+  --color-urgent-border: #c0463f45;
+  --color-high: #c2832e;
+  --color-high-bg: #c2832e16;
+  --color-high-border: #c2832e45;
+  --color-medium: #4f7396;
+  --color-medium-bg: #4f739616;
+  --color-medium-border: #4f739645;
+  --color-low: #938c7c;
+  --color-low-bg: #938c7c16;
+  --color-low-border: #938c7c45;
+  --color-runover-bg: #fbf0e2;
+  --color-runover-border: #ead3ac;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-weight: 400;
+  background-color: var(--color-bg);
+  color: var(--color-text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
