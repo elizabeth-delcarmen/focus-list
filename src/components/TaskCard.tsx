@@ -39,7 +39,7 @@ export function TaskCard({
   const colors = PRIORITY_COLORS[task.priority];
 
   const stateClass = isTimerActive
-    ? `ring-2 ring-accent ring-offset-1 shadow-sm ${colors.bg}`
+    ? `ring-2 ring-text-primary ring-offset-1 shadow-sm ${colors.bg}`
     : isSelected
       ? `ring-2 ring-medium ring-offset-1 ${colors.bg}`
       : `border ${colors.bg} ${colors.border}`;
@@ -78,7 +78,7 @@ export function TaskCard({
         )}
         <span className="flex w-full items-center justify-between gap-2">
           <span className="truncate text-[13px] font-medium text-text-primary">{task.title}</span>
-          <span className="shrink-0 rounded-full bg-surface/80 px-2.5 py-0.5 text-[11px] font-medium text-text-muted">
+          <span className={`shrink-0 text-[11px] font-semibold tabular-nums ${colors.text}`}>
             {formatMinutes(task.estimate_minutes)}
           </span>
         </span>
@@ -97,7 +97,7 @@ export function TaskCard({
         type="button"
         onClick={() => onStart(task.id)}
         aria-label={`Start focus on ${task.title}`}
-        className="shrink-0 px-1.5 py-3 text-accent transition-colors hover:text-accent-bright"
+        className="shrink-0 px-1.5 py-3 text-text-muted transition-colors hover:text-accent"
       >
         <Play size={16} fill="currentColor" />
       </button>

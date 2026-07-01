@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Button } from './Button';
 
 interface SignInScreenProps {
   onSignIn: (email: string) => Promise<void>;
@@ -61,13 +62,9 @@ export function SignInScreen({ onSignIn }: SignInScreenProps) {
               className="w-full rounded-full border border-border bg-surface px-5 py-3 text-sm text-text-primary outline-none placeholder:text-text-faint focus:border-accent"
             />
             {error && <p className="text-sm text-urgent">{error}</p>}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-full bg-accent px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-bright disabled:opacity-50"
-            >
+            <Button type="submit" disabled={loading} className="w-full py-3">
               {loading ? 'Sending…' : 'Send magic link'}
-            </button>
+            </Button>
           </form>
         )}
       </div>

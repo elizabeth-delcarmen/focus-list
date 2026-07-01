@@ -215,8 +215,8 @@ export function TaskQueue({
       </div>
 
       {fittingTasks && fittingTasks.length > 0 && (
-        <div className="mt-4 rounded-[12px] border border-accent/30 bg-accent-soft px-4 py-3">
-          <p className="text-xs font-medium text-accent">
+        <div className="mt-4 rounded-[12px] border border-border bg-surface-raised px-4 py-3">
+          <p className="text-xs font-medium text-text-primary">
             You have {formatMinutes(availableMinutes ?? 0)} left today
           </p>
           <p className="mt-0.5 text-[11px] text-text-muted">
@@ -229,12 +229,12 @@ export function TaskQueue({
                 <button
                   type="button"
                   onClick={() => onSelectTask(task.id)}
-                  className="flex w-full items-start justify-between gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-white/60"
+                  className="flex w-full items-start justify-between gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-surface"
                 >
                   <span className="min-w-0 flex-1 text-[13px] text-text-primary line-clamp-2">
                     {task.title}
                   </span>
-                  <span className="shrink-0 text-[11px] font-medium text-accent">
+                  <span className="shrink-0 text-[11px] font-medium text-text-muted">
                     {formatMinutes(task.estimate_minutes)}
                   </span>
                 </button>

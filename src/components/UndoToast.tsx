@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { Button } from './Button';
 
 interface UndoToastProps {
   taskTitle: string;
@@ -20,13 +21,9 @@ export function UndoToast({ taskTitle, onUndo, onDismiss }: UndoToastProps) {
         <span className="font-medium">{taskTitle}</span>
         <span className="text-text-muted"> completed</span>
       </p>
-      <button
-        type="button"
-        onClick={onUndo}
-        className="shrink-0 rounded-full bg-accent px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-accent-bright"
-      >
+      <Button size="sm" onClick={onUndo}>
         Undo
-      </button>
+      </Button>
     </div>
   );
 }

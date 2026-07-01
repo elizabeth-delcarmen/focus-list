@@ -42,27 +42,31 @@ export const PRIORITY_ORDER: Record<Priority, number> = {
 
 export const PRIORITY_COLORS: Record<
   Priority,
-  { bg: string; border: string; dot: string }
+  { bg: string; border: string; dot: string; text: string }
 > = {
   urgent: {
     bg: 'bg-urgent-bg',
     border: 'border-urgent-border',
     dot: 'bg-urgent',
+    text: 'text-urgent',
   },
   high: {
     bg: 'bg-high-bg',
     border: 'border-high-border',
     dot: 'bg-high',
+    text: 'text-high',
   },
   medium: {
     bg: 'bg-medium-bg',
     border: 'border-medium-border',
     dot: 'bg-medium',
+    text: 'text-medium',
   },
   low: {
     bg: 'bg-low-bg',
     border: 'border-low-border',
     dot: 'bg-low',
+    text: 'text-low',
   },
 };
 

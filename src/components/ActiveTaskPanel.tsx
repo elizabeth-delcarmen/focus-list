@@ -1,4 +1,5 @@
 import { Hourglass, Play } from 'lucide-react';
+import { Button } from './Button';
 import { formatMinutes, formatTimerDisplay } from '../types';
 import type { Task } from '../types';
 import { PRIORITY_COLORS } from '../types';
@@ -50,6 +51,8 @@ export function ActiveTaskPanel({
       ? -(elapsedSeconds - task.estimate_minutes * 60)
       : remainingSeconds;
 
+  const priorityColors = PRIORITY_COLORS[task.priority];
+
   const timerColor = isPreview
     ? 'text-text-faint'
     : isRunOver
@@ -60,18 +63,11 @@ export function ActiveTaskPanel({
 
   return (
     <div className="flex min-h-[280px] flex-1 flex-col items-center justify-center rounded-[14px] border border-border bg-surface p-5 sm:min-h-[360px] sm:p-8">
-      <div className="flex w-full max-w-[360px] items-start justify-between">
-        {task.category ? (
-          <span className="rounded-full bg-surface-raised px-3 py-1 text-xs font-medium text-text-muted">
-            {task.category}
-          </span>
-        ) : (
-          <span />
-        )}
-        <span
-          className={`h-2.5 w-2.5 rounded-full ${PRIORITY_COLORS[task.priority].dot}`}
-        />
-      </div>
+      {task.category ? (
+        <span className="rounded-full bg-surface-raised px-3 py-1 text-xs font-medium text-text-muted">
+          {task.category}
+        </span>
+      ) : null}
 
       <h2 className="mt-4 max-w-[360px] text-center text-lg font-semibold leading-snug text-text-primary sm:mt-6 sm:text-[22px]">
         {task.title}
@@ -85,12 +81,26 @@ export function ActiveTaskPanel({
       </p>
 
       <p className="mt-2 text-xs text-text-muted">
-        {isPreview
-          ? `estimated · ${formatMinutes(task.estimate_minutes)}`
-          : isRunOver
-            ? 'over estimate'
-            : 'remaining'}{' '}
-        {!isPreview && `· est. ${task.estimate_minutes} min`}
+        {isPreview ? (
+          <>
+            estimated ·{' '}
+            <span className={`font-semibold ${priorityColors.text}`}>
+              {formatMinutes(task.estimate_minutes)}
+            </span>
+          </>
+        ) : isRunOver ? (
+          'over estimate'
+        ) : (
+          'remaining'
+        )}{' '}
+        {!isPreview && (
+          <>
+            · est.{' '}
+            <span className={`font-semibold ${priorityColors.text}`}>
+              {task.estimate_minutes} min
+            </span>
+          </>
+        )}
       </p>
 
       <div className="mt-6 h-1.5 w-full max-w-[280px] overflow-hidden rounded-full bg-surface-raised">
@@ -101,38 +111,33 @@ export function ActiveTaskPanel({
       </div>
 
       {isPreview ? (
-        <button
-          type="button"
-          onClick={onStartFocus}
-          className="mt-8 flex items-center gap-2 rounded-full bg-accent px-8 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-bright"
-        >
+        <Button size="lg" onClick={onStartFocus} className="mt-8">
           <Play size={16} fill="currentColor" />
           Start focus
-        </button>
+        </Button>
       ) : (
         <div className="mt-6 flex w-full max-w-[320px] flex-wrap justify-center gap-2 sm:mt-8 sm:max-w-none sm:gap-3">
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             onClick={onPause}
             disabled={!isRunning && !isPaused}
-            className="min-w-[88px] flex-1 rounded-[12px] border border-border bg-surface px-4 py-2.5 text-sm font-medium text-text-primary transition-colors hover:bg-surface-raised disabled:opacity-40 sm:flex-none sm:px-5"
+            className="min-w-[88px] flex-1 rounded-[12px] sm:flex-none sm:px-5"
           >
             {isPaused ? 'Resume' : 'Pause'}
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="secondary"
             onClick={onCancel}
-            className="min-w-[88px] flex-1 rounded-[12px] border border-border bg-surface px-4 py-2.5 text-sm font-medium text-text-primary transition-colors hover:bg-surface-raised sm:flex-none sm:px-5"
+            className="min-w-[88px] flex-1 rounded-[12px] sm:flex-none sm:px-5"
           >
             Cancel
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
             onClick={onDone}
-            className="min-w-[88px] flex-1 rounded-[12px] bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-bright sm:flex-none sm:px-5"
+            className="min-w-[88px] flex-1 rounded-[12px] sm:flex-none sm:px-5"
           >
             Done
-          </button>
+          </Button>
         </div>
       )}
     </div>

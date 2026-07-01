@@ -3,30 +3,37 @@
 @theme {
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
 
-  --color-bg: #faf8f3;
+  /* Neutral chrome — matches holdlist / fintrack blue-grey */
+  --color-bg: #f3f4f7;
   --color-surface: #ffffff;
-  --color-surface-raised: #f1eee5;
-  --color-border: #e1dccf;
-  --color-text-primary: #211e19;
-  --color-text-muted: #6e6a5e;
-  --color-text-faint: #9a9587;
-  --color-accent: #7c3b6b;
-  --color-accent-soft: #7c3b6b14;
-  --color-accent-bright: #b26a9e;
-  --color-urgent: #c0463f;
-  --color-urgent-bg: #c0463f16;
-  --color-urgent-border: #c0463f45;
-  --color-high: #c2832e;
-  --color-high-bg: #c2832e16;
-  --color-high-border: #c2832e45;
-  --color-medium: #4f7396;
-  --color-medium-bg: #4f739616;
-  --color-medium-border: #4f739645;
-  --color-low: #938c7c;
-  --color-low-bg: #938c7c16;
-  --color-low-border: #938c7c45;
-  --color-runover-bg: #fbf0e2;
-  --color-runover-border: #ead3ac;
+  --color-surface-raised: #eceef4;
+  --color-border: #d0d5e0;
+  --color-text-primary: #1c2433;
+  --color-text-muted: #8a96aa;
+  --color-text-faint: #a8b0c0;
+
+  /* Brand accent — primary / secondary / tertiary buttons */
+  --color-accent: #40916c;
+  --color-accent-soft: #40916c18;
+  --color-accent-bright: #2d6a4f;
+  --color-accent-border: #40916c40;
+
+  --color-runover-bg: #eceef4;
+  --color-runover-border: #d0d5e0;
+
+  /* Priority colours — harmonised with forest green accent */
+  --color-urgent: #be123c;
+  --color-urgent-bg: #be123c2a;
+  --color-urgent-border: #be123c60;
+  --color-high: #c2410c;
+  --color-high-bg: #c2410c2a;
+  --color-high-border: #c2410c60;
+  --color-medium: #0f766e;
+  --color-medium-bg: #0f766e2a;
+  --color-medium-border: #0f766e60;
+  --color-low: #6b8f71;
+  --color-low-bg: #6b8f712a;
+  --color-low-border: #6b8f7160;
 }
 
 * {

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Calendar, Clock, List, LogOut } from 'lucide-react';
+import { Button } from './Button';
 import {
   DAILY_CAPACITY_MINUTES,
   formatMinutes,
@@ -69,13 +70,14 @@ function CapacityCard({
         <p className="text-[11px] font-medium uppercase tracking-wide text-text-faint">
           {isCustomWindow ? 'Time until end' : "Today's capacity"}
         </p>
-        <button
-          type="button"
+        <Button
+          variant="tertiary"
+          size="sm"
           onClick={() => setEditing(!editing)}
-          className="text-[10px] font-medium text-accent hover:text-accent-bright"
+          className="h-auto min-h-0 px-1 py-0 text-[10px] font-medium"
         >
           {editing ? 'Close' : 'Set window'}
-        </button>
+        </Button>
       </div>
 
       <p className="mt-1 text-sm font-semibold text-text-primary">
@@ -108,17 +110,18 @@ function CapacityCard({
           <p className="text-[11px] text-text-muted">Available until…</p>
           <div className="flex flex-wrap gap-1.5">
             {END_PRESETS.map((preset) => (
-              <button
+              <Button
                 key={`${preset.hours}:${preset.minutes}`}
-                type="button"
+                variant="secondary"
+                size="sm"
                 onClick={() => {
                   onSetEndTime(preset);
                   setEditing(false);
                 }}
-                className="rounded-full bg-surface-raised px-2.5 py-1 text-[11px] font-medium text-text-muted hover:bg-accent-soft hover:text-accent"
+                className="px-2.5 py-1 text-[11px]"
               >
                 {formatTimeLabel(preset.hours, preset.minutes)}
-              </button>
+              </Button>
             ))}
           </div>
           <div className="flex gap-2">
@@ -128,25 +131,22 @@ function CapacityCard({
               onChange={(e) => setCustomTime(e.target.value)}
               className="flex-1 rounded-full border border-border bg-bg px-3 py-1.5 text-xs outline-none focus:border-accent"
             />
-            <button
-              type="button"
-              onClick={handleCustomApply}
-              className="rounded-full bg-accent px-3 py-1.5 text-xs font-medium text-white"
-            >
+            <Button size="sm" onClick={handleCustomApply}>
               Set
-            </button>
+            </Button>
           </div>
           {isCustomWindow && (
-            <button
-              type="button"
+            <Button
+              variant="tertiary"
+              size="sm"
               onClick={() => {
                 onClearEndTime();
                 setEditing(false);
               }}
-              className="text-[11px] text-text-faint hover:text-text-muted"
+              className="h-auto min-h-0 px-1 py-0 text-[11px] text-text-faint hover:text-text-muted"
             >
               Reset to {formatMinutes(DAILY_CAPACITY_MINUTES)} default
-            </button>
+            </Button>
           )}
         </div>
       )}

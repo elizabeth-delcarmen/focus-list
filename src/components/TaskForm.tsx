@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Button } from './Button';
 import { PRIORITY_COLORS, TIME_CHIPS } from '../types';
 import type { Priority, TaskFormValues } from '../types';
 
@@ -147,20 +148,12 @@ export function TaskForm({
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-full border border-border px-4 py-2 text-sm font-medium text-text-muted transition-colors hover:bg-surface-raised"
-        >
+        <Button variant="tertiary" onClick={onCancel}>
           Cancel
-        </button>
-        <button
-          type="submit"
-          disabled={!title.trim() || submitting}
-          className="rounded-full bg-accent px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-bright disabled:opacity-50"
-        >
+        </Button>
+        <Button type="submit" disabled={!title.trim() || submitting}>
           {submitLabel}
-        </button>
+        </Button>
         {onDelete && (
           <button
             type="button"
