@@ -12,28 +12,32 @@
   --color-text-muted: #8a96aa;
   --color-text-faint: #a8b0c0;
 
-  /* Brand accent — primary / secondary / tertiary buttons */
-  --color-accent: #40916c;
-  --color-accent-soft: #40916c18;
-  --color-accent-bright: #2d6a4f;
-  --color-accent-border: #40916c40;
+  /* Brand accent — warm dark slate */
+  --color-accent: #3d3530;
+  --color-accent-soft: #3d353014;
+  --color-accent-bright: #2e2824;
+  --color-accent-border: #3d353045;
 
   --color-runover-bg: #eceef4;
   --color-runover-border: #d0d5e0;
 
-  /* Priority colours — harmonised with forest green accent */
-  --color-urgent: #be123c;
-  --color-urgent-bg: #be123c2a;
-  --color-urgent-border: #be123c60;
-  --color-high: #c2410c;
-  --color-high-bg: #c2410c2a;
-  --color-high-border: #c2410c60;
-  --color-medium: #0f766e;
-  --color-medium-bg: #0f766e2a;
-  --color-medium-border: #0f766e60;
-  --color-low: #6b8f71;
-  --color-low-bg: #6b8f712a;
-  --color-low-border: #6b8f7160;
+  /* Priority colours */
+  --color-urgent: #c0463f;
+  --color-urgent-bg: #c0463f16;
+  --color-urgent-border: #c0463f45;
+  --color-urgent-line: #c0463f30;
+  --color-high: #c2832e;
+  --color-high-bg: #c2832e16;
+  --color-high-border: #c2832e45;
+  --color-high-line: #c2832e30;
+  --color-medium: #4f7396;
+  --color-medium-bg: #4f739616;
+  --color-medium-border: #4f739645;
+  --color-medium-line: #4f739630;
+  --color-low: #938c7c;
+  --color-low-bg: #938c7c16;
+  --color-low-border: #938c7c45;
+  --color-low-line: #938c7c30;
 }
 
 * {
@@ -53,4 +57,17 @@ body {
 #root {
   min-height: 100vh;
   min-height: 100dvh;
+}
+
+@media (max-width: 767px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    font-size: 16px;
+  }
 }

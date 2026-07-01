@@ -38,8 +38,8 @@ export function ActiveTaskPanel({
       <div className="flex flex-1 items-center justify-center rounded-[14px] border border-border bg-surface p-8">
         <div className="text-center">
           <Hourglass size={32} className="mx-auto mb-4 text-text-faint" strokeWidth={1.5} />
-          <p className="text-sm font-medium text-text-muted">Select a task from your queue</p>
-          <p className="mt-1 text-xs text-text-faint">Then press Start focus when you&apos;re ready</p>
+          <p className="text-base font-medium text-text-muted md:text-sm">Select a task from your queue</p>
+          <p className="mt-1 text-base text-text-faint md:text-xs">Then press Start focus when you&apos;re ready</p>
         </div>
       </div>
     );
@@ -64,23 +64,20 @@ export function ActiveTaskPanel({
   return (
     <div className="flex min-h-[280px] flex-1 flex-col items-center justify-center rounded-[14px] border border-border bg-surface p-5 sm:min-h-[360px] sm:p-8">
       {task.category ? (
-        <span className="rounded-full bg-surface-raised px-3 py-1 text-xs font-medium text-text-muted">
+        <span className="rounded-full bg-surface-raised px-3 py-1 text-base font-medium text-text-muted md:text-xs">
           {task.category}
         </span>
       ) : null}
 
-      <h2 className="mt-4 max-w-[360px] text-center text-lg font-semibold leading-snug text-text-primary sm:mt-6 sm:text-[22px]">
+      <h2 className="mt-4 max-w-[360px] text-center text-xl font-semibold leading-snug text-text-primary md:mt-6 md:text-[22px]">
         {task.title}
       </h2>
 
-      <p
-        className={`mt-6 font-bold tabular-nums sm:mt-8 ${timerColor}`}
-        style={{ fontSize: 'clamp(3rem, 14vw, 6rem)', lineHeight: 1 }}
-      >
+      <p className={`mt-6 text-[72px] font-bold leading-none tabular-nums md:mt-8 md:text-[96px] ${timerColor}`}>
         {formatTimerDisplay(displaySeconds)}
       </p>
 
-      <p className="mt-2 text-xs text-text-muted">
+      <p className="mt-2 text-base text-text-muted md:text-xs">
         {isPreview ? (
           <>
             estimated ·{' '}

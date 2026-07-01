@@ -4,9 +4,9 @@ type ButtonVariant = 'primary' | 'secondary' | 'tertiary';
 type ButtonSize = 'sm' | 'md' | 'lg';
 
 const sizeClasses: Record<ButtonSize, string> = {
-  sm: 'px-3 py-1.5 text-xs',
-  md: 'px-4 py-2 text-sm',
-  lg: 'px-8 py-3 text-sm font-semibold',
+  sm: 'px-3 py-1.5 text-[15px] md:text-xs',
+  md: 'px-4 py-2 text-[15px] md:text-sm',
+  lg: 'px-8 py-3 text-[15px] md:text-sm font-semibold',
 };
 
 const variantClasses: Record<ButtonVariant, string> = {

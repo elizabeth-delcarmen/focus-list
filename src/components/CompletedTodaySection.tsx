@@ -19,9 +19,9 @@ export function CompletedTodaySection({ tasks }: CompletedTodaySectionProps) {
         onClick={() => setOpen(!open)}
         className="flex w-full items-center justify-between rounded-full px-1 py-1 text-left transition-colors hover:text-text-primary"
       >
-        <span className="text-[11px] font-medium uppercase tracking-wide text-text-faint">
+        <span className="text-[13px] font-medium uppercase tracking-wide text-text-faint md:text-[11px]">
           Completed today
-          <span className="ml-2 normal-case text-text-muted">({tasks.length})</span>
+          <span className="ml-2 text-base normal-case text-text-muted md:text-sm">({tasks.length})</span>
         </span>
         <ChevronDown
           size={16}
@@ -36,10 +36,10 @@ export function CompletedTodaySection({ tasks }: CompletedTodaySectionProps) {
               key={task.id}
               className="flex items-center justify-between rounded-[12px] border border-border bg-surface-raised/60 px-4 py-2.5"
             >
-              <span className="truncate text-[13px] text-text-muted line-through decoration-text-faint/60">
+              <span className="truncate text-base text-text-muted line-through decoration-text-faint/60 md:text-[13px]">
                 {task.title}
               </span>
-              <span className="ml-2 shrink-0 text-[11px] text-text-faint">
+              <span className="ml-2 shrink-0 text-base text-text-faint md:text-[11px]">
                 {task.actual_minutes > 0
                   ? `${formatMinutes(task.actual_minutes)} tracked`
                   : formatMinutes(task.estimate_minutes)}

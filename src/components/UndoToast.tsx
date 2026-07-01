@@ -17,7 +17,7 @@ export function UndoToast({ taskTitle, onUndo, onDismiss }: UndoToastProps) {
 
   return (
     <div className="fixed bottom-24 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-full border border-border bg-surface px-4 py-2.5 shadow-lg lg:bottom-6">
-      <p className="max-w-[200px] truncate text-sm text-text-primary sm:max-w-xs">
+      <p className="max-w-[200px] truncate text-base text-text-primary sm:max-w-xs md:text-sm">
         <span className="font-medium">{taskTitle}</span>
         <span className="text-text-muted"> completed</span>
       </p>

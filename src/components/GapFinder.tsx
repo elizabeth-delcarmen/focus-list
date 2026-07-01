@@ -48,14 +48,14 @@ export function GapFinder({
           <Clock size={14} />
           I have a few minutes — what fits?
           {activeMinutes !== null && (
-            <span className="rounded-full bg-accent/15 px-2 py-0.5 text-xs">
+            <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[15px] md:text-xs">
               ≤{activeMinutes}m
             </span>
           )}
         </Button>
       ) : (
         <div className="rounded-[12px] border border-border bg-surface p-4">
-          <p className="text-sm font-medium text-text-primary">How many minutes do you have?</p>
+          <p className="text-base font-medium text-text-primary md:text-sm">How many minutes do you have?</p>
           <div className="mt-3 flex flex-wrap gap-2">
             {suggestedMinutes != null && suggestedMinutes > 0 && (
               <Button size="sm" onClick={() => handleSelect(suggestedMinutes)}>
@@ -75,7 +75,7 @@ export function GapFinder({
               value={custom}
               onChange={(e) => setCustom(e.target.value)}
               placeholder="Custom"
-              className="flex-1 rounded-full border border-border bg-bg px-4 py-2 text-sm outline-none focus:border-accent"
+              className="flex-1 rounded-full border border-border bg-bg px-4 py-2 text-base outline-none placeholder:text-base focus:border-accent md:text-sm md:placeholder:text-sm"
             />
             <Button onClick={handleCustom}>Go</Button>
           </div>

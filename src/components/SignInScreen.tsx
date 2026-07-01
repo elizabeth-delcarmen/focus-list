@@ -32,17 +32,17 @@ export function SignInScreen({ onSignIn }: SignInScreenProps) {
     <div className="flex min-h-screen items-center justify-center bg-bg px-4">
       <div className="w-full max-w-sm text-center">
         <h1 className="mb-2 text-2xl font-semibold text-text-primary">Focus List</h1>
-        <p className="mb-8 text-sm text-text-muted">
+        <p className="mb-8 text-base text-text-muted md:text-sm">
           Daily task planning with focus timers
         </p>
 
         {sent ? (
           <div className="rounded-[14px] border border-border bg-surface p-6 text-left">
             <p className="font-medium text-text-primary">Check your email</p>
-            <p className="mt-2 text-sm text-text-muted">
+            <p className="mt-2 text-base text-text-muted md:text-sm">
               We sent a magic link to <span className="font-medium">{email}</span>.
             </p>
-            <div className="mt-4 rounded-[10px] bg-surface-raised px-3 py-2.5 text-[12px] leading-relaxed text-text-muted">
+            <div className="mt-4 rounded-[10px] bg-surface-raised px-3 py-2.5 text-base leading-relaxed text-text-muted md:text-[12px]">
               <p className="font-medium text-text-primary">Using Cursor&apos;s preview?</p>
               <p className="mt-1">
                 Email links open in Safari/Chrome by default. Either sign in there at{' '}
@@ -59,9 +59,9 @@ export function SignInScreen({ onSignIn }: SignInScreenProps) {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               required
-              className="w-full rounded-full border border-border bg-surface px-5 py-3 text-sm text-text-primary outline-none placeholder:text-text-faint focus:border-accent"
+              className="w-full rounded-full border border-border bg-surface px-5 py-3 text-base text-text-primary outline-none placeholder:text-base placeholder:text-text-faint focus:border-accent md:text-sm md:placeholder:text-sm"
             />
-            {error && <p className="text-sm text-urgent">{error}</p>}
+            {error && <p className="text-base text-urgent md:text-sm">{error}</p>}
             <Button type="submit" disabled={loading} className="w-full py-3">
               {loading ? 'Sending…' : 'Send magic link'}
             </Button>

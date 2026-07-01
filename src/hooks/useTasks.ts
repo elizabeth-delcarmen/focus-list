@@ -194,11 +194,12 @@ export function useTasks(userId: string | undefined): UseTasksResult {
   }, []);
 
   const reorderTasks = useCallback(async (newOrder: Task[]) => {
-    setTasks(newOrder);
+    const withOrder = newOrder.map((task, index) => ({ ...task, order: index }));
+    setTasks(withOrder);
 
     const client = requireSupabase();
-    const updates = newOrder.map((task, index) =>
-      client.from('tasks').update({ order: index }).eq('id', task.id),
+    const updates = withOrder.map((task) =>
+      client.from('tasks').update({ order: task.order }).eq('id', task.id),
     );
 
     const results = await Promise.all(updates);

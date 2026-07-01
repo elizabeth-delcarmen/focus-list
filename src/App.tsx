@@ -51,7 +51,7 @@ export default function App() {
   if (authLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-bg">
-        <p className="text-sm text-text-muted">Loading…</p>
+        <p className="text-base text-text-muted md:text-sm">Loading…</p>
       </div>
     );
   }
@@ -77,13 +77,13 @@ export default function App() {
         />
         <main className="flex min-h-0 flex-1 flex-col overflow-auto pb-20 lg:pb-0">
           {error && (
-            <div className="mx-4 mt-4 rounded-[12px] border border-urgent-border bg-urgent-bg px-4 py-2 text-sm text-urgent sm:mx-6">
+            <div className="mx-4 mt-4 rounded-[12px] border border-urgent-border bg-urgent-bg px-4 py-2 text-base text-urgent sm:mx-6 md:text-sm">
               {error}
             </div>
           )}
           {tasksLoading && currentView === 'today' ? (
             <div className="flex flex-1 items-center justify-center">
-              <p className="text-sm text-text-muted">Loading tasks…</p>
+              <p className="text-base text-text-muted md:text-sm">Loading tasks…</p>
             </div>
           ) : currentView === 'today' ? (
             <TodayView

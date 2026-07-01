@@ -13,7 +13,7 @@ export function TopBar() {
           type="search"
           placeholder="Search tasks…"
           disabled
-          className="w-40 rounded-full border border-border bg-surface py-2 pl-9 pr-4 text-sm text-text-primary outline-none placeholder:text-text-faint md:w-56"
+          className="w-40 rounded-full border border-border bg-surface py-2 pl-9 pr-4 text-base text-text-primary outline-none placeholder:text-base placeholder:text-text-faint md:w-56 md:text-sm md:placeholder:text-sm"
         />
       </div>
     </header>

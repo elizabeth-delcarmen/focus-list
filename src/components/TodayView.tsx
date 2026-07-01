@@ -170,18 +170,6 @@ export function TodayView({
     await deleteTask(id);
   };
 
-  const handleCompleteTask = async (taskId: string) => {
-    const task = tasks.find((t) => t.id === taskId);
-    if (!task) return;
-
-    const actualMinutes =
-      timer.activeTaskId === taskId
-        ? Math.ceil(timer.elapsedSeconds / 60)
-        : task.actual_minutes;
-
-    await markComplete(taskId, actualMinutes);
-  };
-
   return (
     <>
       <div className="flex flex-1 flex-col gap-4 p-4 sm:gap-6 sm:p-6 lg:flex-row">
@@ -225,7 +213,6 @@ export function TodayView({
             onAddTask={addTask}
             onUpdateTask={updateTask}
             onDeleteTask={handleDeleteTask}
-            onCompleteTask={handleCompleteTask}
           />
         </div>
       </div>

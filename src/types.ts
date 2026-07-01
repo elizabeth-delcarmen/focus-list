@@ -42,29 +42,33 @@ export const PRIORITY_ORDER: Record<Priority, number> = {
 
 export const PRIORITY_COLORS: Record<
   Priority,
-  { bg: string; border: string; dot: string; text: string }
+  { bg: string; border: string; line: string; dot: string; text: string }
 > = {
   urgent: {
     bg: 'bg-urgent-bg',
     border: 'border-urgent-border',
+    line: 'bg-urgent-line',
     dot: 'bg-urgent',
     text: 'text-urgent',
   },
   high: {
     bg: 'bg-high-bg',
     border: 'border-high-border',
+    line: 'bg-high-line',
     dot: 'bg-high',
     text: 'text-high',
   },
   medium: {
     bg: 'bg-medium-bg',
     border: 'border-medium-border',
+    line: 'bg-medium-line',
     dot: 'bg-medium',
     text: 'text-medium',
   },
   low: {
     bg: 'bg-low-bg',
     border: 'border-low-border',
+    line: 'bg-low-line',
     dot: 'bg-low',
     text: 'text-low',
   },
@@ -152,7 +156,15 @@ export function groupTasks(tasks: Task[], mode: GroupMode): TaskGroup[] {
     return order.indexOf(a) - order.indexOf(b);
   });
 
-  return labels.map((label) => ({ label, tasks: buckets.get(label)! }));
+  return labels.map((label) => {
+    const bucketTasks = buckets.get(label)!;
+    if (mode === 'duration') {
+      bucketTasks.sort(
+        (a, b) => a.estimate_minutes - b.estimate_minutes || a.order - b.order,
+      );
+    }
+    return { label, tasks: bucketTasks };
+  });
 }
 
 export function sumEstimateMinutes(tasks: Task[]): number {

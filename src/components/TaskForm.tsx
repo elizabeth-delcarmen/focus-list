@@ -70,7 +70,7 @@ export function TaskForm({
         onChange={(e) => setTitle(e.target.value)}
         placeholder="What needs your focus?"
         autoFocus
-        className="w-full rounded-full border border-border bg-bg px-[14px] py-[14px] text-[15px] text-text-primary outline-none placeholder:text-text-faint focus:border-accent"
+        className="w-full rounded-full border border-border bg-bg px-[14px] py-[14px] text-base text-text-primary outline-none placeholder:text-base placeholder:text-text-faint focus:border-accent md:text-[15px] md:placeholder:text-[15px]"
       />
 
       <div className="mt-3 flex flex-wrap gap-2">
@@ -79,7 +79,7 @@ export function TaskForm({
             key={mins}
             type="button"
             onClick={() => selectChip(mins)}
-            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+            className={`rounded-full px-3 py-1 text-[15px] font-medium transition-colors md:text-xs ${
               estimate === mins && !customEstimate
                 ? 'bg-accent-soft text-accent'
                 : 'bg-surface-raised text-text-muted hover:text-text-primary'
@@ -94,7 +94,7 @@ export function TaskForm({
           value={customEstimate}
           onChange={(e) => handleCustomEstimate(e.target.value)}
           placeholder="Custom"
-          className="w-20 rounded-full border border-border bg-bg px-3 py-1 text-xs text-text-primary outline-none placeholder:text-text-faint focus:border-accent"
+          className="w-20 rounded-full border border-border bg-bg px-3 py-1 text-base text-text-primary outline-none placeholder:text-base placeholder:text-text-faint focus:border-accent md:text-xs md:placeholder:text-xs"
         />
       </div>
 
@@ -117,14 +117,14 @@ export function TaskForm({
       <div className="mt-3">
         {existingCategories.length > 0 && (
           <>
-            <p className="mb-2 text-[11px] font-medium text-text-faint">Recent categories</p>
+            <p className="mb-2 text-[13px] font-medium text-text-faint md:text-[11px]">Recent categories</p>
             <div className="flex flex-wrap gap-2">
               {existingCategories.map((name) => (
                 <button
                   key={name}
                   type="button"
                   onClick={() => setCategory(name)}
-                  className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                  className={`rounded-full px-3 py-1 text-[15px] font-medium transition-colors md:text-xs ${
                     category === name
                       ? 'bg-accent-soft text-accent'
                       : 'bg-surface-raised text-text-muted hover:text-text-primary'
@@ -141,7 +141,7 @@ export function TaskForm({
           value={category}
           onChange={(e) => setCategory(e.target.value)}
           placeholder={existingCategories.length > 0 ? 'Or type a new category' : 'Category (optional)'}
-          className={`w-full rounded-full border border-border bg-bg px-4 py-2 text-sm text-text-primary outline-none placeholder:text-text-faint focus:border-accent ${
+          className={`w-full rounded-full border border-border bg-bg px-4 py-2 text-base text-text-primary outline-none placeholder:text-base placeholder:text-text-faint focus:border-accent md:text-sm md:placeholder:text-sm ${
             existingCategories.length > 0 ? 'mt-2' : ''
           }`}
         />
@@ -158,7 +158,7 @@ export function TaskForm({
           <button
             type="button"
             onClick={() => void onDelete()}
-            className="ml-auto rounded-full border border-urgent-border px-4 py-2 text-sm font-medium text-urgent transition-colors hover:bg-urgent-bg"
+            className="ml-auto rounded-full border border-urgent-border px-4 py-2 text-[15px] font-medium text-urgent transition-colors hover:bg-urgent-bg md:text-sm"
           >
             Delete
           </button>

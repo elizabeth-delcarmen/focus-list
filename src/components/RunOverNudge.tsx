@@ -20,7 +20,7 @@ export function RunOverNudge({
 
   return (
     <div className="mt-4 rounded-[12px] border border-runover-border bg-runover-bg px-5 py-4">
-      <p className="text-sm text-text-primary">
+      <p className="text-base text-text-primary md:text-sm">
         You estimated {task.estimate_minutes} min — you&apos;re at{' '}
         <span className="font-semibold">{formatTimerDisplay(-overSeconds)}</span>. Keep going?
       </p>
@@ -28,21 +28,21 @@ export function RunOverNudge({
         <button
           type="button"
           onClick={onExtend10}
-          className="rounded-full border border-high-border bg-high-bg px-4 py-1.5 text-xs font-medium text-high transition-colors hover:bg-high/20"
+          className="rounded-full border border-high-border bg-high-bg px-4 py-1.5 text-[15px] font-medium text-high transition-colors hover:bg-high/20 md:text-xs"
         >
           +10 min
         </button>
         <button
           type="button"
           onClick={onExtend25}
-          className="rounded-full border border-high-border bg-high-bg px-4 py-1.5 text-xs font-medium text-high transition-colors hover:bg-high/20"
+          className="rounded-full border border-high-border bg-high-bg px-4 py-1.5 text-[15px] font-medium text-high transition-colors hover:bg-high/20 md:text-xs"
         >
           +25 min
         </button>
         <button
           type="button"
           onClick={onMarkDone}
-          className="rounded-full bg-high px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-high/90"
+          className="rounded-full bg-high px-4 py-1.5 text-[15px] font-semibold text-white transition-colors hover:bg-high/90 md:text-xs"
         >
           Mark done
         </button>
