@@ -217,11 +217,30 @@ export function TaskQueue({
       {fittingTasks && fittingTasks.length > 0 && (
         <div className="mt-4 rounded-[12px] border border-accent/30 bg-accent-soft px-4 py-3">
           <p className="text-xs font-medium text-accent">
-            Fits in your window ({formatMinutes(sumEstimateMinutes(fittingTasks))})
+            You have {formatMinutes(availableMinutes ?? 0)} left today
           </p>
-          <p className="mt-1 text-[11px] text-text-muted">
-            {fittingTasks.map((t) => t.title).join(' · ')}
+          <p className="mt-0.5 text-[11px] text-text-muted">
+            These {fittingTasks.length} task{fittingTasks.length === 1 ? '' : 's'} fit in that window (
+            {formatMinutes(sumEstimateMinutes(fittingTasks))} total):
           </p>
+          <ul className="mt-2 space-y-1">
+            {fittingTasks.map((task) => (
+              <li key={task.id}>
+                <button
+                  type="button"
+                  onClick={() => onSelectTask(task.id)}
+                  className="flex w-full items-start justify-between gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-white/60"
+                >
+                  <span className="min-w-0 flex-1 text-[13px] text-text-primary line-clamp-2">
+                    {task.title}
+                  </span>
+                  <span className="shrink-0 text-[11px] font-medium text-accent">
+                    {formatMinutes(task.estimate_minutes)}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 

@@ -36,12 +36,19 @@ export function SignInScreen({ onSignIn }: SignInScreenProps) {
         </p>
 
         {sent ? (
-          <div className="rounded-[14px] border border-border bg-surface p-6">
+          <div className="rounded-[14px] border border-border bg-surface p-6 text-left">
             <p className="font-medium text-text-primary">Check your email</p>
             <p className="mt-2 text-sm text-text-muted">
               We sent a magic link to <span className="font-medium">{email}</span>.
-              Click it to sign in.
             </p>
+            <div className="mt-4 rounded-[10px] bg-surface-raised px-3 py-2.5 text-[12px] leading-relaxed text-text-muted">
+              <p className="font-medium text-text-primary">Using Cursor&apos;s preview?</p>
+              <p className="mt-1">
+                Email links open in Safari/Chrome by default. Either sign in there at{' '}
+                <span className="font-medium text-text-primary">localhost:5173</span>, or
+                copy the link from your email and paste it into this preview&apos;s address bar.
+              </p>
+            </div>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
