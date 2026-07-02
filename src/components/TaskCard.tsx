@@ -1,13 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useDndContext } from '@dnd-kit/core';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, MoreVertical, Pencil, Trash2 } from 'lucide-react';
+import { CircleCheck, GripVertical, Pencil, Trash2 } from 'lucide-react';
 import { PRIORITY_COLORS } from '../types';
 import type { Task } from '../types';
-
-const LONG_PRESS_MS = 500;
-const MENU_MOVE_TOLERANCE = 8;
 
 export interface TaskCardProps {
   task: Task;
@@ -15,10 +12,15 @@ export interface TaskCardProps {
   isTimerActive: boolean;
   isCompleting?: boolean;
   showCategory?: boolean;
+  actionLabel?: 'Start' | 'Plan';
+  planningMode?: boolean;
+  planSelected?: boolean;
+  onPlanToggle?: (taskId: string) => void;
   onSelect: (taskId: string) => void;
   onStart: (taskId: string) => void;
   onEdit: (taskId: string) => void;
   onDelete: (taskId: string) => void;
+  onComplete?: (taskId: string) => void;
   /** Drag overlay clone — no interaction, elevated shadow */
   isDragOverlay?: boolean;
   /** Original slot while dragging — hidden but keeps layout */
@@ -31,56 +33,29 @@ export function TaskCard({
   isTimerActive,
   isCompleting = false,
   showCategory = true,
+  actionLabel = 'Start',
+  planningMode = false,
+  planSelected = false,
+  onPlanToggle,
   onSelect,
   onStart,
   onEdit,
   onDelete,
+  onComplete,
   isDragOverlay = false,
   isDragPlaceholder = false,
 }: TaskCardProps) {
-  const [menuOpen, setMenuOpen] = useState(false);
   const [isTouchLike, setIsTouchLike] = useState(false);
-
-  const menuButtonRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const longPressTimerRef = useRef<number | null>(null);
-  const longPressTriggeredRef = useRef(false);
-  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
-  const dragGestureRef = useRef(false);
+  const [checkHovered, setCheckHovered] = useState(false);
 
   const colors = PRIORITY_COLORS[task.priority];
+  const canComplete = Boolean(onComplete) && !isDragOverlay && !planningMode;
 
   const stateClass = isTimerActive
     ? 'ring-2 ring-text-primary shadow-sm'
     : isSelected
       ? 'ring-2 ring-medium'
       : '';
-
-  const menuButtonVisibility =
-    menuOpen || isDragOverlay
-      ? 'opacity-100 pointer-events-auto'
-      : 'opacity-100 pointer-events-auto lg:opacity-0 lg:pointer-events-none lg:group-hover/card:opacity-100 lg:group-hover/card:pointer-events-auto lg:focus-within/card:opacity-100 lg:focus-within/card:pointer-events-auto';
-
-  const clearLongPressTimer = useCallback(() => {
-    if (longPressTimerRef.current !== null) {
-      window.clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-  }, []);
-
-  const openMenu = useCallback(() => {
-    setMenuOpen(true);
-  }, []);
-
-  const closeMenu = useCallback(() => {
-    setMenuOpen(false);
-  }, []);
-
-  const { active: activeDrag } = useDndContext();
-
-  useEffect(() => {
-    if (activeDrag) closeMenu();
-  }, [activeDrag, closeMenu]);
 
   useEffect(() => {
     const mq = window.matchMedia('(hover: none), (pointer: coarse)');
@@ -90,114 +65,122 @@ export function TaskCard({
     return () => mq.removeEventListener('change', update);
   }, []);
 
-  useEffect(() => {
-    if (!menuOpen || isDragOverlay) return;
-
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target as Node;
-      if (menuRef.current?.contains(target) || menuButtonRef.current?.contains(target)) {
-        return;
-      }
-      closeMenu();
-    };
-
-    document.addEventListener('pointerdown', handlePointerDown);
-    return () => document.removeEventListener('pointerdown', handlePointerDown);
-  }, [menuOpen, closeMenu, isDragOverlay]);
-
-  const handleMenuToggle = (event: React.MouseEvent) => {
+  const handleComplete = (event: React.MouseEvent) => {
     event.stopPropagation();
-    setMenuOpen((open) => !open);
+    if (!canComplete) return;
+    onComplete?.(task.id);
   };
 
-  const handleEdit = () => {
-    closeMenu();
+  const handleEdit = (event: React.MouseEvent) => {
+    event.stopPropagation();
     onEdit(task.id);
   };
 
-  const handleDelete = () => {
-    closeMenu();
-    onDelete(task.id);
-  };
-
-  const handleCardTouchStart = (event: React.TouchEvent) => {
-    if (!isTouchLike || isDragOverlay) return;
-
-    clearLongPressTimer();
-    longPressTriggeredRef.current = false;
-    dragGestureRef.current = false;
-    touchStartRef.current = {
-      x: event.touches[0].clientX,
-      y: event.touches[0].clientY,
-    };
-
-    longPressTimerRef.current = window.setTimeout(() => {
-      if (!dragGestureRef.current) {
-        longPressTriggeredRef.current = true;
-        openMenu();
-      }
-    }, LONG_PRESS_MS);
-  };
-
-  const handleCardTouchEnd = () => {
-    clearLongPressTimer();
-    touchStartRef.current = null;
-    dragGestureRef.current = false;
-  };
-
-  const handleCardTouchMove = (event: React.TouchEvent) => {
-    if (!touchStartRef.current) return;
-
-    const dx = event.touches[0].clientX - touchStartRef.current.x;
-    const dy = event.touches[0].clientY - touchStartRef.current.y;
-
-    if (Math.hypot(dx, dy) > MENU_MOVE_TOLERANCE) {
-      dragGestureRef.current = true;
-      clearLongPressTimer();
-      if (menuOpen) closeMenu();
+  const handleDelete = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (window.confirm(`Delete "${task.title}"?`)) {
+      onDelete(task.id);
     }
   };
 
   const handleSelect = () => {
-    if (longPressTriggeredRef.current) {
-      longPressTriggeredRef.current = false;
+    if (planningMode) {
+      onPlanToggle?.(task.id);
       return;
     }
     onSelect(task.id);
   };
 
+  const handlePlanCheckbox = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    onPlanToggle?.(task.id);
+  };
+
+  const stopTouchPropagation = (event: React.TouchEvent) => {
+    event.stopPropagation();
+  };
+
+  const actionIconBase =
+    'flex h-7 w-7 items-center justify-center rounded-full transition-opacity duration-150 ease hover:bg-white/60 focus-visible:opacity-100';
+
+  const actionIconVisibility = isTouchLike
+    ? 'opacity-70 pointer-events-auto'
+    : 'pointer-events-none opacity-0 group-hover/card:pointer-events-auto group-hover/card:opacity-70';
+
   const cardClassName = [
-    'group/card flex min-w-0 flex-1 items-center gap-[14px] rounded-[12px] border px-4 py-[14px] transition-all duration-300 ease-out',
+    'group/card flex min-w-0 flex-1 items-center gap-[14px] rounded-[12px] border px-4 py-[14px] transition-opacity duration-300 ease-out',
     colors.bg,
     colors.border,
     stateClass,
-    menuOpen ? 'relative z-50' : '',
-    isDragOverlay
-      ? 'scale-[1.02] shadow-[0_8px_24px_rgba(33,30,25,0.18)]'
-      : '',
+    isDragOverlay ? 'scale-[1.02] shadow-[0_8px_24px_rgba(33,30,25,0.18)]' : '',
     isDragPlaceholder ? 'opacity-0' : '',
-    isCompleting && !isDragOverlay ? 'pointer-events-none scale-95 opacity-0' : '',
-    !isDragOverlay && !isCompleting && !isDragPlaceholder ? 'scale-100 opacity-100' : '',
+    isCompleting && !isDragOverlay ? 'pointer-events-none opacity-0' : '',
+    !isDragOverlay && !isCompleting && !isDragPlaceholder ? 'opacity-100' : '',
   ]
     .filter(Boolean)
     .join(' ');
 
   return (
-    <div
-      onTouchStart={isDragOverlay ? undefined : handleCardTouchStart}
-      onTouchEnd={isDragOverlay ? undefined : handleCardTouchEnd}
-      onTouchMove={isDragOverlay ? undefined : handleCardTouchMove}
-      onTouchCancel={isDragOverlay ? undefined : handleCardTouchEnd}
-      className={cardClassName}
-    >
-      <div className={`flex w-10 shrink-0 flex-col items-center ${colors.text}`}>
-        <span className="text-[22px] font-bold tabular-nums leading-none md:text-[20px]">
-          {task.estimate_minutes}
-        </span>
-        <span className="mt-0.5 text-[11px] font-medium uppercase tracking-[0.06em] opacity-70">
-          min
-        </span>
-      </div>
+    <div data-task-interactive="" className={cardClassName}>
+      {planningMode ? (
+        <button
+          type="button"
+          onClick={handlePlanCheckbox}
+          aria-label={planSelected ? `Deselect ${task.title}` : `Select ${task.title}`}
+          aria-pressed={planSelected}
+          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+            planSelected ? 'border-accent bg-accent' : 'border-border'
+          }`}
+        >
+          {planSelected ? (
+            <span className="h-2 w-2 rounded-full bg-white" aria-hidden />
+          ) : null}
+        </button>
+      ) : null}
+
+      <button
+        type="button"
+        onClick={handleComplete}
+        disabled={!canComplete}
+        aria-label={`Mark ${task.title} as done`}
+        onMouseEnter={() => setCheckHovered(true)}
+        onMouseLeave={() => setCheckHovered(false)}
+        onTouchStart={stopTouchPropagation}
+        onTouchEnd={stopTouchPropagation}
+        onTouchMove={stopTouchPropagation}
+        className={[
+          'group/time relative flex w-10 shrink-0 flex-col items-center justify-center',
+          colors.text,
+          canComplete ? 'cursor-pointer' : '',
+          isTouchLike && canComplete ? 'rounded-full border border-current/25 px-0.5 py-1' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+      >
+        <div
+          className={`flex flex-col items-center transition-opacity duration-100 ease ${
+            !isTouchLike && canComplete ? 'group-hover/card:opacity-0' : ''
+          }`}
+        >
+          <span className="text-[22px] font-bold tabular-nums leading-none md:text-[20px]">
+            {task.estimate_minutes}
+          </span>
+          <span className="mt-0.5 text-[11px] font-medium uppercase tracking-[0.06em] opacity-70">
+            min
+          </span>
+        </div>
+
+        {!isTouchLike && canComplete ? (
+          <CircleCheck
+            size={22}
+            strokeWidth={2}
+            aria-hidden
+            className={`absolute transition-opacity duration-100 ease ${colors.text} ${
+              checkHovered ? 'opacity-100' : 'opacity-0 group-hover/card:opacity-60'
+            }`}
+          />
+        ) : null}
+      </button>
 
       <div className={`h-9 w-px shrink-0 ${colors.line}`} aria-hidden />
 
@@ -218,60 +201,46 @@ export function TaskCard({
       </button>
 
       {!isDragOverlay && (
-        <div className="relative shrink-0">
+        <div className="flex shrink-0 items-center gap-0.5">
           <button
-            ref={menuButtonRef}
             type="button"
-            onClick={handleMenuToggle}
-            aria-label={`Actions for ${task.title}`}
-            aria-expanded={menuOpen}
-            aria-haspopup="menu"
-            className={`flex h-7 w-7 items-center justify-center rounded-full text-[#6E6A5E] transition-opacity hover:bg-white/60 ${menuButtonVisibility}`}
+            onClick={handleEdit}
+            aria-label={`Edit ${task.title}`}
+            onTouchStart={stopTouchPropagation}
+            onTouchEnd={stopTouchPropagation}
+            onTouchMove={stopTouchPropagation}
+            className={`${actionIconBase} ${actionIconVisibility} text-[#6E6A5E] hover:opacity-100`}
           >
-            <MoreVertical size={16} strokeWidth={2} />
+            <Pencil size={16} strokeWidth={2} />
           </button>
-
-          {menuOpen ? (
-            <div
-              ref={menuRef}
-              role="menu"
-              className="absolute right-0 top-full z-20 mt-1 min-w-[140px] rounded-[10px] border border-[#E1DCCF] bg-[#FFFFFF] p-1 shadow-[0_4px_12px_rgba(33,30,25,0.1)]"
-            >
-              <button
-                type="button"
-                role="menuitem"
-                onClick={handleEdit}
-                className="flex w-full items-center gap-2 rounded-[7px] px-3 py-2 text-left text-[15px] font-medium text-[#211E19] transition-colors hover:bg-[#F3F4F7] md:text-[12px]"
-              >
-                <Pencil size={14} strokeWidth={2} />
-                Edit task
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={handleDelete}
-                className="flex w-full items-center gap-2 rounded-[7px] px-3 py-2 text-left text-[15px] font-medium text-[#C0463F] transition-colors hover:bg-[#C0463F10] md:text-[12px]"
-              >
-                <Trash2 size={14} strokeWidth={2} />
-                Delete
-              </button>
-            </div>
-          ) : null}
+          <button
+            type="button"
+            onClick={handleDelete}
+            aria-label={`Delete ${task.title}`}
+            onTouchStart={stopTouchPropagation}
+            onTouchEnd={stopTouchPropagation}
+            onTouchMove={stopTouchPropagation}
+            className={`${actionIconBase} ${actionIconVisibility} text-[#C0463F] hover:opacity-100`}
+          >
+            <Trash2 size={16} strokeWidth={2} />
+          </button>
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={() => onStart(task.id)}
-        disabled={isDragOverlay}
-        aria-label={`Start focus on ${task.title}`}
-        className={`shrink-0 rounded-full border px-[10px] py-1 text-[14px] font-semibold md:text-[11px] ${colors.text} ${colors.bg} ${colors.border}`}
-        onTouchStart={(event) => event.stopPropagation()}
-        onTouchEnd={(event) => event.stopPropagation()}
-        onTouchMove={(event) => event.stopPropagation()}
-      >
-        Start
-      </button>
+      {!planningMode ? (
+        <button
+          type="button"
+          onClick={() => onStart(task.id)}
+          disabled={isDragOverlay}
+          aria-label={`${actionLabel === 'Plan' ? 'Plan' : 'Start focus on'} ${task.title}`}
+          className={`shrink-0 rounded-full border px-[10px] py-1 text-[14px] font-semibold md:text-[11px] ${colors.text} ${colors.bg} ${colors.border}`}
+          onTouchStart={stopTouchPropagation}
+          onTouchEnd={stopTouchPropagation}
+          onTouchMove={stopTouchPropagation}
+        >
+          {actionLabel}
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -283,11 +252,13 @@ function DropIndicator() {
 export interface SortableTaskCardProps extends Omit<TaskCardProps, 'isDragOverlay' | 'isDragPlaceholder'> {
   showDropLineBefore?: boolean;
   showDropLineAfter?: boolean;
+  sortableDisabled?: boolean;
 }
 
 export function SortableTaskCard({
   showDropLineBefore = false,
   showDropLineAfter = false,
+  sortableDisabled = false,
   ...props
 }: SortableTaskCardProps) {
   const { active } = useDndContext();
@@ -303,6 +274,7 @@ export function SortableTaskCard({
     isDragging,
   } = useSortable({
     id: props.task.id,
+    disabled: sortableDisabled,
     animateLayoutChanges: () => false,
   });
 
@@ -332,10 +304,10 @@ export function SortableTaskCard({
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} className="group/row">
+    <div ref={setNodeRef} style={style} {...attributes} data-task-interactive="" className="group/row">
       {showDropLineBefore && <DropIndicator />}
       <div className="flex items-stretch">
-        {!isTouchLike && (
+        {!isTouchLike && !sortableDisabled && (
           <div className="flex w-4 shrink-0 items-center justify-center">
             <button
               ref={gripRef}
@@ -353,7 +325,7 @@ export function SortableTaskCard({
 
         <div
           ref={cardActivatorRef}
-          {...(isTouchLike ? listeners : {})}
+          {...(isTouchLike && !sortableDisabled ? listeners : {})}
           className={`flex min-w-0 flex-1 ${isTouchLike ? 'touch-none' : ''} ${isDragging ? 'cursor-grabbing' : ''}`}
         >
           <TaskCard {...props} isDragPlaceholder={isDragging} />

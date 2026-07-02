@@ -1,35 +1,35 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActiveTaskPanel } from './ActiveTaskPanel';
 import { RunOverNudge } from './RunOverNudge';
 import { TaskQueue } from './TaskQueue';
 import { UndoToast } from './UndoToast';
 import { useTimer } from '../hooks/useTimer';
-import type { NewTaskInput, Task } from '../types';
+import type { Task } from '../types';
 
-const COMPLETE_ANIM_MS = 280;
+const COMPLETE_ANIM_MS = 300;
 
 interface TodayViewProps {
   tasks: Task[];
   completedTasks: Task[];
-  availableMinutes: number;
-  addTask: (input: NewTaskInput) => Promise<Task | null>;
+  tasksLoading?: boolean;
   updateTask: (id: string, changes: Partial<Task>) => Promise<void>;
   completeTask: (id: string, changes: Partial<Task>) => Promise<Task | null>;
   undoComplete: (snapshot: Task) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
   reorderTasks: (newOrder: Task[]) => Promise<void>;
+  onNavigateToBacklog?: () => void;
 }
 
 export function TodayView({
   tasks,
   completedTasks,
-  availableMinutes,
-  addTask,
+  tasksLoading = false,
   updateTask,
   completeTask,
   undoComplete,
   deleteTask,
   reorderTasks,
+  onNavigateToBacklog,
 }: TodayViewProps) {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
@@ -129,6 +129,19 @@ export function TodayView({
     setSelectedTaskId(taskId);
   };
 
+  useEffect(() => {
+    if (!selectedTaskId || timerActive) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Element;
+      if (target.closest('[data-task-interactive]')) return;
+      setSelectedTaskId(null);
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [selectedTaskId, timerActive]);
+
   const handleStartTask = async (taskId: string) => {
     setSelectedTaskId(taskId);
     await timer.startTask(taskId);
@@ -164,6 +177,21 @@ export function TodayView({
     await timer.extendEstimate(minutes);
   };
 
+  const handleCompleteTask = useCallback(
+    async (taskId: string) => {
+      const task = tasks.find((t) => t.id === taskId);
+      if (!task) return;
+
+      const actualMinutes =
+        timer.activeTaskId === taskId
+          ? Math.ceil(timer.elapsedSeconds / 60)
+          : task.estimate_minutes;
+
+      await markComplete(taskId, actualMinutes);
+    },
+    [tasks, timer.activeTaskId, timer.elapsedSeconds, markComplete],
+  );
+
   const handleDeleteTask = async (id: string) => {
     if (selectedTaskId === id) setSelectedTaskId(null);
     if (timer.activeTaskId === id) await timer.cancel();
@@ -176,6 +204,7 @@ export function TodayView({
         <div className="flex w-full flex-col lg:w-[55%]">
           <ActiveTaskPanel
             task={displayTask}
+            loading={tasksLoading}
             remainingSeconds={timer.remainingSeconds}
             elapsedSeconds={timer.elapsedSeconds}
             progress={timer.progress}
@@ -206,13 +235,14 @@ export function TodayView({
             selectedTaskId={selectedTaskId}
             timerTaskId={timerActive ? timer.activeTaskId : null}
             completingTaskId={completingTaskId}
-            availableMinutes={availableMinutes}
+            loading={tasksLoading}
             onSelectTask={handleSelectTask}
             onStartTask={handleStartTask}
             onReorder={reorderTasks}
-            onAddTask={addTask}
             onUpdateTask={updateTask}
             onDeleteTask={handleDeleteTask}
+            onCompleteTask={handleCompleteTask}
+            onNavigateToBacklog={onNavigateToBacklog}
           />
         </div>
       </div>

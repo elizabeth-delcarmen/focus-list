@@ -16,7 +16,7 @@ export interface Task {
   order: number;
   created_at: string;
   completed_at?: string | null;
-  scheduled_date: string;
+  scheduled_date: string | null;
 }
 
 export interface NewTaskInput {
@@ -74,6 +74,7 @@ export const PRIORITY_COLORS: Record<
   },
 };
 
+export const NAV_DROP_TARGET_TODAY = 'nav:today';
 export const TIME_CHIPS = [5, 15, 30, 45, 60] as const;
 export const DAILY_CAPACITY_MINUTES = 300;
 
@@ -129,6 +130,25 @@ export function getDurationBucket(estimateMinutes: number): string {
   return 'Deep (45m+)';
 }
 
+export const CATEGORY_GROUP_PREFIX = 'group:';
+
+export function getTaskCategoryGroupLabel(task: Task): string {
+  return task.category?.trim() || 'Uncategorized';
+}
+
+export function categoryGroupLabelToValue(label: string): string | null {
+  return label === 'Uncategorized' ? null : label;
+}
+
+export function toCategoryGroupId(label: string): string {
+  return `${CATEGORY_GROUP_PREFIX}${label}`;
+}
+
+export function parseCategoryGroupId(id: string | number): string | null {
+  if (typeof id !== 'string' || !id.startsWith(CATEGORY_GROUP_PREFIX)) return null;
+  return id.slice(CATEGORY_GROUP_PREFIX.length);
+}
+
 export function groupTasks(tasks: Task[], mode: GroupMode): TaskGroup[] {
   if (mode === 'list') {
     return [{ label: '', tasks }];
@@ -139,7 +159,7 @@ export function groupTasks(tasks: Task[], mode: GroupMode): TaskGroup[] {
   for (const task of tasks) {
     const key =
       mode === 'category'
-        ? task.category?.trim() || 'Uncategorized'
+        ? getTaskCategoryGroupLabel(task)
         : getDurationBucket(task.estimate_minutes);
 
     if (!buckets.has(key)) buckets.set(key, []);

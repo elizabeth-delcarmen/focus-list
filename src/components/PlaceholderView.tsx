@@ -1,8 +1,8 @@
-import { Calendar, List } from 'lucide-react';
+import { Calendar } from 'lucide-react';
 import type { View } from '../types';
 
 interface PlaceholderViewProps {
-  view: 'week' | 'backlog';
+  view: 'week';
 }
 
 const CONFIG = {
@@ -10,11 +10,6 @@ const CONFIG = {
     icon: Calendar,
     title: 'This week',
     message: 'This week — coming soon',
-  },
-  backlog: {
-    icon: List,
-    title: 'Backlog',
-    message: 'Backlog — coming soon',
   },
 } as const;
 
@@ -29,6 +24,6 @@ export function PlaceholderView({ view }: PlaceholderViewProps) {
   );
 }
 
-export function isPlaceholderView(view: View): view is 'week' | 'backlog' {
-  return view === 'week' || view === 'backlog';
+export function isPlaceholderView(view: View): view is 'week' {
+  return view === 'week';
 }

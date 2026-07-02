@@ -15,25 +15,17 @@ export function useAuth() {
 
     const client = requireSupabase();
 
-    const initAuth = async () => {
-      // Handle PKCE magic-link callback (?code= in URL)
+    const handleMagicLinkCallback = async () => {
       const params = new URLSearchParams(window.location.search);
       const code = params.get('code');
+      if (!code) return;
 
-      if (code) {
-        const { error } = await client.auth.exchangeCodeForSession(code);
-        if (error) console.error('Auth callback error:', error.message);
-        // Clean up URL so refresh doesn't retry
-        window.history.replaceState({}, '', window.location.pathname);
-      }
-
-      const { data: { session: currentSession } } = await client.auth.getSession();
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
-      setLoading(false);
+      const { error } = await client.auth.exchangeCodeForSession(code);
+      if (error) console.error('Auth callback error:', error.message);
+      window.history.replaceState({}, '', window.location.pathname);
     };
 
-    void initAuth();
+    void handleMagicLinkCallback();
 
     const {
       data: { subscription },

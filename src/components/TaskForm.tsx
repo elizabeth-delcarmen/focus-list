@@ -7,6 +7,7 @@ interface TaskFormProps {
   initial?: Partial<TaskFormValues>;
   existingCategories?: string[];
   submitLabel: string;
+  variant?: 'inline' | 'sheet';
   onSubmit: (values: TaskFormValues) => Promise<void>;
   onCancel: () => void;
   onDelete?: () => Promise<void>;
@@ -18,6 +19,7 @@ export function TaskForm({
   initial,
   existingCategories = [],
   submitLabel,
+  variant = 'inline',
   onSubmit,
   onCancel,
   onDelete,
@@ -62,7 +64,12 @@ export function TaskForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-[12px] border border-dashed border-border bg-surface p-4"
+      data-task-interactive={variant === 'inline' ? '' : undefined}
+      className={
+        variant === 'sheet'
+          ? 'px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-1'
+          : 'rounded-[12px] border border-dashed border-border bg-surface p-4'
+      }
     >
       <input
         type="text"
@@ -147,14 +154,22 @@ export function TaskForm({
         />
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Button variant="tertiary" onClick={onCancel}>
+      <div className={`mt-4 flex gap-2 ${variant === 'sheet' ? '' : 'flex-wrap'}`}>
+        <Button
+          variant={variant === 'sheet' ? 'secondary' : 'tertiary'}
+          onClick={onCancel}
+          className={variant === 'sheet' ? 'flex-1' : undefined}
+        >
           Cancel
         </Button>
-        <Button type="submit" disabled={!title.trim() || submitting}>
+        <Button
+          type="submit"
+          disabled={!title.trim() || submitting}
+          className={variant === 'sheet' ? 'flex-1' : undefined}
+        >
           {submitLabel}
         </Button>
-        {onDelete && (
+        {onDelete && variant === 'inline' && (
           <button
             type="button"
             onClick={() => void onDelete()}

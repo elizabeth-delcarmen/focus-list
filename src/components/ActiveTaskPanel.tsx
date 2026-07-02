@@ -1,4 +1,5 @@
 import { Hourglass, Play } from 'lucide-react';
+import { ActiveTaskPanelSkeleton } from './Skeleton';
 import { Button } from './Button';
 import { formatMinutes, formatTimerDisplay } from '../types';
 import type { Task } from '../types';
@@ -6,6 +7,7 @@ import { PRIORITY_COLORS } from '../types';
 
 interface ActiveTaskPanelProps {
   task: Task | null;
+  loading?: boolean;
   remainingSeconds: number;
   elapsedSeconds: number;
   progress: number;
@@ -21,6 +23,7 @@ interface ActiveTaskPanelProps {
 
 export function ActiveTaskPanel({
   task,
+  loading = false,
   remainingSeconds,
   elapsedSeconds,
   progress,
@@ -33,6 +36,10 @@ export function ActiveTaskPanel({
   onCancel,
   onDone,
 }: ActiveTaskPanelProps) {
+  if (loading) {
+    return <ActiveTaskPanelSkeleton />;
+  }
+
   if (!task) {
     return (
       <div className="flex flex-1 items-center justify-center rounded-[14px] border border-border bg-surface p-8">
@@ -62,7 +69,10 @@ export function ActiveTaskPanel({
   const barProgress = isPreview ? 0 : Math.min(100, progress * 100);
 
   return (
-    <div className="flex min-h-[280px] flex-1 flex-col items-center justify-center rounded-[14px] border border-border bg-surface p-5 sm:min-h-[360px] sm:p-8">
+    <div
+      data-task-interactive=""
+      className="flex min-h-[280px] flex-1 flex-col items-center justify-center rounded-[14px] border border-border bg-surface p-5 sm:min-h-[360px] sm:p-8"
+    >
       {task.category ? (
         <span className="rounded-full bg-surface-raised px-3 py-1 text-base font-medium text-text-muted md:text-xs">
           {task.category}
