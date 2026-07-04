@@ -9,6 +9,7 @@ import { ChoreForm } from './ChoreForm';
 import { ChoreRepeatPromptSheet } from './ChoreRepeatPromptSheet';
 import { FocusTimerScreen } from './FocusTimerScreen';
 import { TaskQueueSkeleton } from './Skeleton';
+import { useChoreRooms } from '../hooks/useChoreRooms';
 import { useTimer } from '../hooks/useTimer';
 import {
   dateStringToISO,
@@ -18,7 +19,6 @@ import {
   formatNextDueInterval,
   getChoreInterval,
   getScheduleFilterForChore,
-  getUniqueRooms,
   groupChoresByRoom,
   groupChoresForScheduleView,
   isChoreOverdue,
@@ -131,7 +131,7 @@ export function ChoresView({
     onPendingScheduleFilterApplied?.();
   }, [pendingScheduleFilter, onPendingScheduleFilterApplied]);
 
-  const existingRooms = useMemo(() => getUniqueRooms(chores), [chores]);
+  const { existingRooms, rememberRoom } = useChoreRooms(chores);
 
   const totalOverdueCount = useMemo(() => countOverdueChores(chores), [chores]);
 
@@ -393,6 +393,7 @@ export function ChoresView({
           submitLabel="Save changes"
           onSubmit={handleEditSave}
           onCancel={() => setEditingChoreId(null)}
+          onRememberRoom={rememberRoom}
           onDelete={async () => {
             await handleDeleteChore(chore.id);
           }}
@@ -572,6 +573,7 @@ export function ChoresView({
         onClose={() => setChoreSheetOpen(false)}
         onAddChore={onAddChore}
         saveError={choresError}
+        onRememberRoom={rememberRoom}
         onChoreAdded={handleChoreAdded}
       />
 

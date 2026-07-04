@@ -9,6 +9,7 @@ interface AddChoreBottomSheetProps {
   onAddChore: (chore: NewChoreInput) => Promise<Chore | null>;
   onChoreAdded?: (chore: Chore) => void;
   saveError?: string | null;
+  onRememberRoom?: (room: string) => void;
   zIndex?: number;
 }
 
@@ -19,6 +20,7 @@ export function AddChoreBottomSheet({
   onAddChore,
   onChoreAdded,
   saveError,
+  onRememberRoom,
   zIndex = 60,
 }: AddChoreBottomSheetProps) {
   return (
@@ -27,6 +29,7 @@ export function AddChoreBottomSheet({
         key={open ? 'open' : 'closed'}
         existingRooms={existingRooms}
         saveError={saveError}
+        onRememberRoom={onRememberRoom}
         onSubmit={async (values) => {
           const created = await onAddChore(values);
           if (!created) return;

@@ -10,11 +10,12 @@ import { TodayView } from './components/TodayView';
 import { TopBar } from './components/TopBar';
 import { useAuth } from './hooks/useAuth';
 import { useCapacityWindow } from './hooks/useCapacityWindow';
+import { useChoreRooms } from './hooks/useChoreRooms';
 import { useChores } from './hooks/useChores';
 import { useTasks } from './hooks/useTasks';
 import { isSupabaseConfigured } from './lib/supabase';
 import { getUniqueCategories, sumEstimateMinutes, getBacklogCompletedTasks } from './types';
-import { getUniqueRooms, getScheduleFilterForChore } from './lib/choreSchedule';
+import { getScheduleFilterForChore } from './lib/choreSchedule';
 import type { Chore, ChoreScheduleFilter, View } from './types';
 
 export default function App() {
@@ -44,6 +45,7 @@ export default function App() {
     updateChore,
     deleteChore,
   } = useChores(user?.id);
+  const { existingRooms, rememberRoom } = useChoreRooms(chores);
   const {
     endTime,
     availableMinutes,
@@ -101,7 +103,8 @@ export default function App() {
           addTodayTask={addTodayTask}
           addBacklogTask={addTask}
           addChore={addChore}
-          existingRooms={getUniqueRooms(chores)}
+          existingRooms={existingRooms}
+          onRememberRoom={rememberRoom}
           onChoreAdded={handleChoreAdded}
           onNavigateToBacklog={() => setCurrentView('backlog')}
         />
@@ -118,7 +121,8 @@ export default function App() {
           onAddToToday={addTodayTask}
           onAddChore={addChore}
           onChoreAdded={handleChoreAdded}
-          existingRooms={getUniqueRooms(chores)}
+          existingRooms={existingRooms}
+          onRememberRoom={rememberRoom}
           onUpdateTask={updateTask}
           onDeleteTask={deleteTask}
           onCompleteTask={async (id) => {

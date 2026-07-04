@@ -26,6 +26,7 @@ interface TodayViewProps {
   addChore?: (chore: NewChoreInput) => Promise<Chore | null>;
   onChoreAdded?: (chore: Chore) => void;
   existingRooms?: string[];
+  onRememberRoom?: (room: string) => void;
   onNavigateToBacklog?: () => void;
 }
 
@@ -43,6 +44,7 @@ export function TodayView({
   addChore,
   onChoreAdded,
   existingRooms = [],
+  onRememberRoom,
   onNavigateToBacklog,
 }: TodayViewProps) {
   const [focusTimerExpanded, setFocusTimerExpanded] = useState(false);
@@ -299,6 +301,7 @@ export function TodayView({
           key={`chore-${sheetKey}`}
           open={choreSheetOpen}
           existingRooms={existingRooms}
+          onRememberRoom={onRememberRoom}
           onClose={() => setChoreSheetOpen(false)}
           onAddChore={addChore}
           onChoreAdded={onChoreAdded}

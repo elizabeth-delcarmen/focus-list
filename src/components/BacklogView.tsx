@@ -21,6 +21,7 @@ interface BacklogViewProps {
   onAddChore?: (input: NewChoreInput) => Promise<Chore | null>;
   onChoreAdded?: (chore: Chore) => void;
   existingRooms?: string[];
+  onRememberRoom?: (room: string) => void;
   onUpdateTask: (id: string, changes: Partial<Task>) => Promise<void>;
   onDeleteTask: (id: string) => Promise<void>;
   onCompleteTask: (id: string) => Promise<Task | null>;
@@ -38,6 +39,7 @@ export function BacklogView({
   onAddChore,
   onChoreAdded,
   existingRooms = [],
+  onRememberRoom,
   onUpdateTask,
   onDeleteTask,
   onCompleteTask,
@@ -240,6 +242,7 @@ export function BacklogView({
           key={`chore-${sheetKey}`}
           open={choreSheetOpen}
           existingRooms={existingRooms}
+          onRememberRoom={onRememberRoom}
           onClose={() => setChoreSheetOpen(false)}
           onAddChore={onAddChore}
           onChoreAdded={onChoreAdded}

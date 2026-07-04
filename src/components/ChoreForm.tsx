@@ -25,6 +25,7 @@ interface ChoreFormProps {
   submitLabel?: string;
   variant?: 'sheet' | 'inline';
   saveError?: string | null;
+  onRememberRoom?: (room: string) => void;
   onSubmit: (values: NewChoreInput | EditChoreInput) => Promise<void>;
   onCancel: () => void;
   onDelete?: () => Promise<void>;
@@ -90,6 +91,7 @@ export function ChoreForm({
   submitLabel = 'Add chore',
   variant = 'sheet',
   saveError,
+  onRememberRoom,
   onSubmit,
   onCancel,
   onDelete,
@@ -107,10 +109,6 @@ export function ChoreForm({
 
   const [title, setTitle] = useState(initial?.title ?? '');
   const [room, setRoom] = useState<string | null>(initial?.room ?? null);
-  const [addedRooms, setAddedRooms] = useState<string[]>(() => {
-    const initialRoom = initial?.room?.trim();
-    return initialRoom ? [initialRoom] : [];
-  });
   const [newRoomMode, setNewRoomMode] = useState(false);
   const [newRoomValue, setNewRoomValue] = useState('');
   const [whenChoice, setWhenChoice] = useState<ChoreWhenChoice>(
@@ -160,10 +158,9 @@ export function ChoreForm({
 
   const displayRooms = useMemo(() => {
     const names = new Set(existingRooms);
-    for (const name of addedRooms) names.add(name);
     if (room) names.add(room);
     return [...names].sort((a, b) => a.localeCompare(b));
-  }, [existingRooms, addedRooms, room]);
+  }, [existingRooms, room]);
 
   const handleRoomSelect = (selectedRoom: string) => {
     setNewRoomMode(false);
@@ -175,7 +172,7 @@ export function ChoreForm({
     const trimmed = newRoomValue.trim();
     if (!trimmed) return;
     setRoom(trimmed);
-    setAddedRooms((prev) => (prev.includes(trimmed) ? prev : [...prev, trimmed]));
+    onRememberRoom?.(trimmed);
     setNewRoomMode(false);
     setNewRoomValue('');
   };
@@ -246,10 +243,12 @@ export function ChoreForm({
       const normalizedTitle = normalizeChoreTitle(title);
       const hasRecurrence = Boolean(recurrence);
       const interval = hasRecurrence ? resolveInterval() : null;
+      const resolvedRoom = resolveRoom();
+      if (resolvedRoom) onRememberRoom?.(resolvedRoom);
 
       const base: NewChoreInput = {
         title: normalizedTitle,
-        room: resolveRoom(),
+        room: resolvedRoom,
         time_estimate_minutes: timeEstimate,
         is_someday: isSomeday,
         repeats: hasRecurrence,
