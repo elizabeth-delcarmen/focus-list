@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { requireSupabase } from '../lib/supabase';
-import { getTodayDateString } from '../types';
+import { getTodayDateString, sortByCompletedAtDesc } from '../types';
 import type { NewTaskInput, Task } from '../types';
 
 interface UseTasksResult {
@@ -10,6 +10,7 @@ interface UseTasksResult {
   loading: boolean;
   error: string | null;
   addTask: (task: NewTaskInput) => Promise<Task | null>;
+  addTodayTask: (task: NewTaskInput) => Promise<Task | null>;
   updateTask: (id: string, changes: Partial<Task>) => Promise<void>;
   completeTask: (id: string, changes: Partial<Task>) => Promise<Task | null>;
   undoComplete: (snapshot: Task) => Promise<void>;
@@ -87,7 +88,8 @@ export function useTasks(userId: string | undefined): UseTasksResult {
     const today = getTodayDateString();
     const client = requireSupabase();
 
-    const [activeResult, completedResult, backlogResult] = await Promise.all([
+    const [activeResult, completedTodayResult, completedBacklogResult, backlogResult] =
+      await Promise.all([
       client
         .from('tasks')
         .select('*')
@@ -107,14 +109,27 @@ export function useTasks(userId: string | undefined): UseTasksResult {
         .select('*')
         .eq('user_id', userId)
         .is('scheduled_date', null)
+        .eq('status', 'done')
+        .order('completed_at', { ascending: false }),
+      client
+        .from('tasks')
+        .select('*')
+        .eq('user_id', userId)
+        .is('scheduled_date', null)
         .neq('status', 'done')
         .order('order', { ascending: true }),
     ]);
 
-    if (activeResult.error || completedResult.error || backlogResult.error) {
+    if (
+      activeResult.error ||
+      completedTodayResult.error ||
+      completedBacklogResult.error ||
+      backlogResult.error
+    ) {
       setError(
         activeResult.error?.message ??
-          completedResult.error?.message ??
+          completedTodayResult.error?.message ??
+          completedBacklogResult.error?.message ??
           backlogResult.error?.message ??
           'Failed to load tasks',
       );
@@ -123,8 +138,13 @@ export function useTasks(userId: string | undefined): UseTasksResult {
       setCompletedTasks([]);
     } else {
       setTasks((activeResult.data as Task[]) ?? []);
-      setCompletedTasks((completedResult.data as Task[]) ?? []);
       setBacklogTasks((backlogResult.data as Task[]) ?? []);
+      setCompletedTasks(
+        sortByCompletedAtDesc([
+          ...((completedTodayResult.data as Task[]) ?? []),
+          ...((completedBacklogResult.data as Task[]) ?? []),
+        ]),
+      );
     }
 
     setLoading(false);
@@ -165,6 +185,40 @@ export function useTasks(userId: string | undefined): UseTasksResult {
       return newTask;
     },
     [userId, backlogTasks],
+  );
+
+  const addTodayTask = useCallback(
+    async (input: NewTaskInput): Promise<Task | null> => {
+      if (!userId) return null;
+
+      const today = getTodayDateString();
+      const maxOrder = tasks.reduce((max, t) => Math.max(max, t.order), -1);
+
+      const { data, error: insertError } = await requireSupabase()
+        .from('tasks')
+        .insert({
+          user_id: userId,
+          title: input.title.trim(),
+          estimate_minutes: input.estimate_minutes,
+          priority: input.priority,
+          category: input.category?.trim() || null,
+          status: 'todo',
+          order: maxOrder + 1,
+          scheduled_date: today,
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        setError(insertError.message);
+        return null;
+      }
+
+      const newTask = data as Task;
+      setTasks((prev) => [...prev, newTask].sort((a, b) => a.order - b.order));
+      return newTask;
+    },
+    [userId, tasks],
   );
 
   const updateTask = useCallback(async (id: string, changes: Partial<Task>) => {
@@ -225,11 +279,7 @@ export function useTasks(userId: string | undefined): UseTasksResult {
 
       setTasks((prev) => prev.filter((t) => t.id !== id));
       setBacklogTasks((prev) => prev.filter((t) => t.id !== id));
-
-      const today = getTodayDateString();
-      if (snapshot.scheduled_date === today) {
-        setCompletedTasks((prev) => [completed, ...prev]);
-      }
+      setCompletedTasks((prev) => sortByCompletedAtDesc([completed, ...prev]));
 
       return snapshot;
     },
@@ -258,8 +308,16 @@ export function useTasks(userId: string | undefined): UseTasksResult {
     };
 
     setCompletedTasks((prev) => prev.filter((t) => t.id !== snapshot.id));
-    setTasks((prev) => [...prev, restored].sort((a, b) => a.order - b.order));
-  }, []);
+
+    const today = getTodayDateString();
+    if (snapshot.scheduled_date === today) {
+      setTasks((prev) => [...prev, restored].sort((a, b) => a.order - b.order));
+    } else if (snapshot.scheduled_date == null) {
+      setBacklogTasks((prev) => [...prev, restored].sort((a, b) => a.order - b.order));
+    } else {
+      void fetchTasks();
+    }
+  }, [fetchTasks]);
 
   const deleteTask = useCallback(async (id: string) => {
     const { error: deleteError } = await requireSupabase()
@@ -392,6 +450,7 @@ export function useTasks(userId: string | undefined): UseTasksResult {
     loading,
     error,
     addTask,
+    addTodayTask,
     updateTask,
     completeTask,
     undoComplete,

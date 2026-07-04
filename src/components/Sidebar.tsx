@@ -1,7 +1,7 @@
 import { useDroppable } from '@dnd-kit/core';
 import { useState } from 'react';
 import { CapacityCardSkeleton } from './Skeleton';
-import { Calendar, Clock, List } from 'lucide-react';
+import { Clock, List, RefreshCw } from 'lucide-react';
 import { Button } from './Button';
 import {
   DAILY_CAPACITY_MINUTES,
@@ -30,7 +30,7 @@ interface SidebarProps {
 const NAV_ITEMS: { id: View; label: string; icon: typeof Clock }[] = [
   { id: 'today', label: 'Today', icon: Clock },
   { id: 'backlog', label: 'Backlog', icon: List },
-  { id: 'week', label: 'This week', icon: Calendar },
+  { id: 'chores', label: 'Chores', icon: RefreshCw },
 ];
 
 const END_PRESETS: CapacityEndTime[] = [

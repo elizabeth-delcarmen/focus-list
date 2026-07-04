@@ -1,48 +1,70 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
+import { AddChoreBottomSheet } from './AddChoreBottomSheet';
 import { AddTaskBottomSheet } from './AddTaskBottomSheet';
+import { AddTaskFab } from './AddTaskFab';
+import { AddTypeChooserSheet } from './AddTypeChooserSheet';
 import { BacklogSortableList, useBacklogDnd } from './BacklogDndProvider';
 import { Button } from './Button';
+import { CompletedTodaySection } from './CompletedTodaySection';
 import { SortableTaskCard } from './TaskCard';
 import { TaskForm } from './TaskForm';
 import { TaskQueueSkeleton } from './Skeleton';
-import { getUniqueCategories, type NewTaskInput, type Task, type TaskFormValues } from '../types';
+import { UndoToast } from './UndoToast';
+import { getUniqueCategories, type NewChoreInput, type NewTaskInput, type Task, type TaskFormValues } from '../types';
 
 interface BacklogViewProps {
   tasks: Task[];
+  completedTasks: Task[];
   loading?: boolean;
   onAddTask: (input: NewTaskInput) => Promise<Task | null>;
+  onAddToToday: (input: NewTaskInput) => Promise<Task | null>;
+  onAddChore?: (input: NewChoreInput) => Promise<unknown>;
+  existingRooms?: string[];
   onUpdateTask: (id: string, changes: Partial<Task>) => Promise<void>;
   onDeleteTask: (id: string) => Promise<void>;
-  onCompleteTask: (id: string) => Promise<void>;
+  onCompleteTask: (id: string) => Promise<Task | null>;
+  onUndoComplete: (snapshot: Task) => Promise<void>;
   onScheduleForToday: (ids: string[]) => Promise<void>;
   onNavigateToToday: () => void;
 }
 
 export function BacklogView({
   tasks,
+  completedTasks,
   loading = false,
   onAddTask,
+  onAddToToday,
+  onAddChore,
+  existingRooms = [],
   onUpdateTask,
   onDeleteTask,
   onCompleteTask,
+  onUndoComplete,
   onScheduleForToday,
   onNavigateToToday,
 }: BacklogViewProps) {
   const { dropTarget } = useBacklogDnd();
   const [planningMode, setPlanningMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [sheetOpen, setSheetOpen] = useState(false);
+  const [chooserOpen, setChooserOpen] = useState(false);
+  const [taskSheetOpen, setTaskSheetOpen] = useState(false);
+  const [choreSheetOpen, setChoreSheetOpen] = useState(false);
   const [sheetKey, setSheetKey] = useState(0);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
+  const [undoSnapshot, setUndoSnapshot] = useState<Task | null>(null);
+
+  const dismissUndo = useCallback(() => setUndoSnapshot(null), []);
 
   const existingCategories = useMemo(() => getUniqueCategories(tasks), [tasks]);
   const selectedCount = selectedIds.size;
 
-  const openAddSheet = () => {
+  const openChooser = () => {
     setSheetKey((key) => key + 1);
-    setSheetOpen(true);
+    setChooserOpen(true);
   };
+
+  const anySheetOpen = chooserOpen || taskSheetOpen || choreSheetOpen;
 
   const exitPlanningMode = () => {
     setPlanningMode(false);
@@ -77,9 +99,18 @@ export function BacklogView({
 
   const handleCompleteTask = async (taskId: string) => {
     setCompletingTaskId(taskId);
+    setUndoSnapshot(null);
     await new Promise((resolve) => setTimeout(resolve, 300));
-    await onCompleteTask(taskId);
+    const snapshot = await onCompleteTask(taskId);
     setCompletingTaskId(null);
+    if (snapshot) setUndoSnapshot(snapshot);
+  };
+
+  const handleUndo = async () => {
+    if (!undoSnapshot) return;
+    const snapshot = undoSnapshot;
+    setUndoSnapshot(null);
+    await onUndoComplete(snapshot);
   };
 
   const handleEditSave = async (values: TaskFormValues) => {
@@ -120,8 +151,6 @@ export function BacklogView({
       <SortableTaskCard
         key={task.id}
         task={task}
-        isSelected={false}
-        isTimerActive={false}
         isCompleting={task.id === completingTaskId}
         showCategory
         actionLabel="Plan"
@@ -159,7 +188,7 @@ export function BacklogView({
         </Button>
         <Button
           variant="secondary"
-          onClick={openAddSheet}
+          onClick={openChooser}
           disabled={planningMode}
           className="hidden font-semibold md:inline-flex"
         >
@@ -185,25 +214,44 @@ export function BacklogView({
         )}
       </div>
 
-      <AddTaskBottomSheet
-        key={sheetKey}
-        open={sheetOpen}
-        existingCategories={existingCategories}
-        onClose={() => setSheetOpen(false)}
-        onAdd={onAddTask}
+      {!loading && (
+        <CompletedTodaySection tasks={completedTasks} title="Completed from backlog" />
+      )}
+
+      <AddTypeChooserSheet
+        open={chooserOpen}
+        onClose={() => setChooserOpen(false)}
+        onSelectTask={() => {
+          setChooserOpen(false);
+          setTaskSheetOpen(true);
+        }}
+        onSelectChore={() => {
+          setChooserOpen(false);
+          setChoreSheetOpen(true);
+        }}
       />
 
-      {!planningMode && !sheetOpen ? (
-        <button
-          type="button"
-          onClick={openAddSheet}
-          aria-label="New task"
-          className="fixed z-50 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-[28px] leading-none text-white shadow-[0_4px_16px_rgba(0,0,0,0.18)] md:hidden"
-          style={{ bottom: 'calc(3.5rem + 24px + env(safe-area-inset-bottom))', right: '24px' }}
-        >
-          +
-        </button>
+      <AddTaskBottomSheet
+        key={`task-${sheetKey}`}
+        open={taskSheetOpen}
+        defaultDestination="backlog"
+        existingCategories={existingCategories}
+        onClose={() => setTaskSheetOpen(false)}
+        onAddToBacklog={onAddTask}
+        onAddToToday={onAddToToday}
+      />
+
+      {onAddChore ? (
+        <AddChoreBottomSheet
+          key={`chore-${sheetKey}`}
+          open={choreSheetOpen}
+          existingRooms={existingRooms}
+          onClose={() => setChoreSheetOpen(false)}
+          onAddChore={onAddChore}
+        />
       ) : null}
+
+      <AddTaskFab onClick={openChooser} hidden={planningMode || anySheetOpen} />
 
       {planningMode ? (
         <div className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-40 border-t border-border bg-surface px-4 py-3 md:static md:mt-6 md:rounded-[12px] md:border md:px-4 md:py-3">
@@ -225,6 +273,14 @@ export function BacklogView({
             </div>
           </div>
         </div>
+      ) : null}
+
+      {undoSnapshot ? (
+        <UndoToast
+          taskTitle={undoSnapshot.title}
+          onUndo={() => void handleUndo()}
+          onDismiss={dismissUndo}
+        />
       ) : null}
     </div>
   );

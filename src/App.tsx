@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { BacklogDndProvider } from './components/BacklogDndProvider';
 import { BacklogView } from './components/BacklogView';
+import { ChoresView } from './components/ChoresView';
 import { TodayViewSkeleton } from './components/Skeleton';
-import { isPlaceholderView, PlaceholderView } from './components/PlaceholderView';
 import { SetupScreen } from './components/SetupScreen';
 import { Sidebar } from './components/Sidebar';
 import { SignInScreen } from './components/SignInScreen';
@@ -10,9 +10,11 @@ import { TodayView } from './components/TodayView';
 import { TopBar } from './components/TopBar';
 import { useAuth } from './hooks/useAuth';
 import { useCapacityWindow } from './hooks/useCapacityWindow';
+import { useChores } from './hooks/useChores';
 import { useTasks } from './hooks/useTasks';
 import { isSupabaseConfigured } from './lib/supabase';
-import { sumEstimateMinutes } from './types';
+import { getUniqueCategories, sumEstimateMinutes, getBacklogCompletedTasks } from './types';
+import { getUniqueRooms } from './lib/choreSchedule';
 import type { View } from './types';
 
 export default function App() {
@@ -24,6 +26,7 @@ export default function App() {
     loading: tasksLoading,
     error,
     addTask,
+    addTodayTask,
     updateTask,
     completeTask,
     undoComplete,
@@ -32,6 +35,13 @@ export default function App() {
     reorderBacklogTasks,
     scheduleForToday,
   } = useTasks(user?.id);
+  const {
+    chores,
+    loading: choresLoading,
+    addChore,
+    completeChore,
+    updateChore,
+  } = useChores(user?.id);
   const {
     endTime,
     availableMinutes,
@@ -42,6 +52,8 @@ export default function App() {
   const [currentView, setCurrentView] = useState<View>('today');
 
   const plannedMinutes = sumEstimateMinutes(tasks);
+  const backlogCompletedTasks = getBacklogCompletedTasks(completedTasks);
+  const existingCategories = getUniqueCategories([...tasks, ...backlogTasks]);
 
   const handleSignOut = async () => {
     localStorage.removeItem('focus-list-active-task-id');
@@ -77,6 +89,10 @@ export default function App() {
           undoComplete={undoComplete}
           deleteTask={deleteTask}
           reorderTasks={reorderTasks}
+          addTodayTask={addTodayTask}
+          addBacklogTask={addTask}
+          addChore={addChore}
+          existingRooms={getUniqueRooms(chores)}
           onNavigateToBacklog={() => setCurrentView('backlog')}
         />
       );
@@ -86,25 +102,41 @@ export default function App() {
       return (
         <BacklogView
           tasks={backlogTasks}
+          completedTasks={backlogCompletedTasks}
           loading={tasksLoading}
           onAddTask={addTask}
+          onAddToToday={addTodayTask}
+          onAddChore={addChore}
+          existingRooms={getUniqueRooms(chores)}
           onUpdateTask={updateTask}
           onDeleteTask={deleteTask}
           onCompleteTask={async (id) => {
             const task = backlogTasks.find((t) => t.id === id);
-            await completeTask(id, {
+            return completeTask(id, {
               completed_at: new Date().toISOString(),
               actual_minutes: task?.estimate_minutes ?? 0,
             });
           }}
+          onUndoComplete={undoComplete}
           onScheduleForToday={scheduleForToday}
           onNavigateToToday={() => setCurrentView('today')}
         />
       );
     }
 
-    if (isPlaceholderView(currentView)) {
-      return <PlaceholderView view={currentView} />;
+    if (currentView === 'chores') {
+      return (
+        <ChoresView
+          chores={chores}
+          loading={choresLoading}
+          onAddChore={addChore}
+          onCompleteChore={completeChore}
+          onUpdateChore={updateChore}
+          addTodayTask={addTodayTask}
+          addBacklogTask={addTask}
+          existingCategories={existingCategories}
+        />
+      );
     }
 
     return null;

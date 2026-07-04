@@ -1,6 +1,9 @@
 export type Priority = 'urgent' | 'high' | 'medium' | 'low';
 export type Status = 'todo' | 'in_progress' | 'done';
-export type View = 'today' | 'week' | 'backlog';
+export type View = 'today' | 'chores' | 'backlog';
+export type RecurrenceType = 'weekly' | 'monthly' | 'quarterly' | 'biannual' | 'yearly';
+export type ChoreFrequencyFilter = RecurrenceType;
+export type ChoreGroupMode = 'day' | 'room';
 export type DurationFilter = 'all' | 'quick' | 'medium' | 'deep';
 export type GroupMode = 'list' | 'category' | 'duration';
 
@@ -26,6 +29,51 @@ export interface NewTaskInput {
   category?: string;
 }
 
+export interface Chore {
+  id: string;
+  user_id: string;
+  title: string;
+  room?: string | null;
+  time_estimate_minutes: number;
+  recurrence_type: RecurrenceType;
+  day_of_week?: number | null;
+  last_completed_at?: string | null;
+  next_due_at: string;
+  actual_time_minutes?: number | null;
+  created_at: string;
+}
+
+export interface NewChoreInput {
+  title: string;
+  room?: string;
+  time_estimate_minutes: number;
+  recurrence_type: RecurrenceType;
+  day_of_week?: number | null;
+}
+
+export const CHORE_TIME_CHIPS = [15, 30, 45, 60] as const;
+
+export const RECURRENCE_OPTIONS: { id: RecurrenceType; label: string }[] = [
+  { id: 'weekly', label: 'Weekly' },
+  { id: 'monthly', label: 'Monthly' },
+  { id: 'quarterly', label: 'Quarterly' },
+  { id: 'biannual', label: 'Biannual' },
+  { id: 'yearly', label: 'Yearly' },
+];
+
+export const CHORE_FREQUENCY_FILTERS: { id: ChoreFrequencyFilter; label: string }[] = [
+  { id: 'weekly', label: 'This week' },
+  { id: 'monthly', label: 'Monthly' },
+  { id: 'quarterly', label: 'Quarterly' },
+  { id: 'biannual', label: 'Biannual' },
+  { id: 'yearly', label: 'Yearly' },
+];
+
+export const CHORE_GROUP_MODES: { id: ChoreGroupMode; label: string }[] = [
+  { id: 'day', label: 'By day' },
+  { id: 'room', label: 'By room' },
+];
+
 export interface TaskFormValues {
   title: string;
   estimate_minutes: number;
@@ -38,6 +86,13 @@ export const PRIORITY_ORDER: Record<Priority, number> = {
   high: 1,
   medium: 2,
   low: 3,
+};
+
+export const PRIORITY_HEX: Record<Priority, { solid: string; track: string }> = {
+  urgent: { solid: '#C0463F', track: '#C0463F16' },
+  high: { solid: '#C2832E', track: '#C2832E16' },
+  medium: { solid: '#4F7396', track: '#4F739616' },
+  low: { solid: '#938C7C', track: '#938C7C16' },
 };
 
 export const PRIORITY_COLORS: Record<
@@ -106,6 +161,23 @@ export function getTodayDateString(): string {
   const month = String(now.getMonth() + 1).padStart(2, '0');
   const day = String(now.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+export function getTodayCompletedTasks(tasks: Task[]): Task[] {
+  const today = getTodayDateString();
+  return tasks.filter((t) => t.scheduled_date === today);
+}
+
+export function getBacklogCompletedTasks(tasks: Task[]): Task[] {
+  return tasks.filter((t) => t.scheduled_date == null);
+}
+
+export function sortByCompletedAtDesc(tasks: Task[]): Task[] {
+  return [...tasks].sort((a, b) => {
+    const aTime = a.completed_at ? new Date(a.completed_at).getTime() : 0;
+    const bTime = b.completed_at ? new Date(b.completed_at).getTime() : 0;
+    return bTime - aTime;
+  });
 }
 
 export function matchesDurationFilter(
