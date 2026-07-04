@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   CHORE_RECURRENCE_OPTIONS,
   TIME_CHIPS,
@@ -123,7 +123,6 @@ export function ChoreForm({
     if (initialWhen === 'pick' && initial?.next_due_on) return initial.next_due_on;
     return null;
   });
-  const dateInputRef = useRef<HTMLInputElement>(null);
   const initialMinutes = initial?.time_estimate_minutes ?? 25;
   const [timeEstimate, setTimeEstimate] = useState(initialMinutes);
   const [customEstimate, setCustomEstimate] = useState(() => {
@@ -145,7 +144,7 @@ export function ChoreForm({
   const firstDueOn = useMemo(() => {
     if (isSomeday) return '';
     if (whenChoice === 'today') return getTodayDateString();
-    if (whenChoice === 'pick' && pickedDueOn) return pickedDueOn;
+    if (whenChoice === 'pick') return pickedDueOn ?? getTodayDateString();
     if (mode === 'edit' && initial?.next_due_on && whenChoice === initialWhen) {
       return initial.next_due_on;
     }
@@ -189,14 +188,9 @@ export function ChoreForm({
     return room ?? undefined;
   };
 
-  const openDatePicker = () => {
-    const input = dateInputRef.current;
-    if (!input) return;
-    if (typeof input.showPicker === 'function') {
-      input.showPicker();
-    } else {
-      input.click();
-    }
+  const selectPickDate = () => {
+    setWhenChoice('pick');
+    setPickedDueOn((current) => current ?? getTodayDateString());
   };
 
   const handleWhenChange = (next: ChoreWhenChoice) => {
@@ -207,11 +201,6 @@ export function ChoreForm({
     } else if (next === 'today') {
       setPickedDueOn(null);
     }
-  };
-
-  const handlePickDate = () => {
-    setWhenChoice('pick');
-    openDatePicker();
   };
 
   const handleDatePicked = (value: string) => {
@@ -375,7 +364,7 @@ export function ChoreForm({
           </SelectChip>
           <SelectChip
             selected={whenChoice === 'pick'}
-            onClick={handlePickDate}
+            onClick={selectPickDate}
           >
             Pick a date
           </SelectChip>
@@ -384,25 +373,14 @@ export function ChoreForm({
           </SelectChip>
         </div>
 
-        {whenChoice === 'pick' && pickedDueOn ? (
-          <button
-            type="button"
-            onClick={openDatePicker}
-            className="mt-2 w-full rounded-[12px] border border-[#D8D2C4] bg-[#FAF8F3] px-[14px] py-[14px] text-left text-base text-[#3D3530] md:text-[15px]"
-          >
-            {formatChoreDueDate(dateStringToISO(pickedDueOn))}
-          </button>
+        {whenChoice === 'pick' ? (
+          <input
+            type="date"
+            value={pickedDueOn ?? getTodayDateString()}
+            onChange={(e) => handleDatePicked(e.target.value)}
+            className="mt-2 w-full rounded-[12px] border border-[#D8D2C4] bg-[#FAF8F3] px-[14px] py-[14px] text-base text-[#3D3530] outline-none focus:border-[#3D3530] md:text-[15px]"
+          />
         ) : null}
-
-        <input
-          ref={dateInputRef}
-          type="date"
-          value={pickedDueOn ?? getTodayDateString()}
-          onChange={(e) => handleDatePicked(e.target.value)}
-          className="fixed left-0 top-0 h-px w-px opacity-0"
-          tabIndex={-1}
-          aria-hidden
-        />
 
         {isSomeday ? (
           <p className="mt-2 text-[14px] font-normal text-[#938C7C] md:text-[13px]">
