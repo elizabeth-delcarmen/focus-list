@@ -1,22 +1,22 @@
 import { useMemo, useRef, useState } from 'react';
 import {
-  INTERVAL_UNITS,
+  CHORE_RECURRENCE_OPTIONS,
   TIME_CHIPS,
   getTodayDateString,
+  type ChoreRecurrencePreset,
+  type ChoreWhenChoice,
   type EditChoreInput,
   type IntervalUnit,
   type NewChoreInput,
 } from '../types';
 import {
   formatChoreDueDate,
-  getCoupleWeeksDateString,
+  formatIntervalLabel,
   getDueDatePreview,
   dateStringToISO,
+  matchChoreFrequencyPreset,
+  normalizeChoreTitle,
 } from '../lib/choreSchedule';
-
-const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'] as const;
-
-type DueDateChoice = 'overdue' | 'couple_weeks' | 'pick' | null;
 
 interface ChoreFormProps {
   existingRooms: string[];
@@ -62,33 +62,25 @@ function SelectChip({
   );
 }
 
-function ToggleSwitch({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      onClick={() => onChange(!checked)}
-      className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
-        checked ? 'bg-[#3D3530]' : 'bg-[#D8D2C4]'
-      }`}
-    >
-      <span
-        className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
-          checked ? 'translate-x-5' : 'translate-x-0'
-        }`}
-      />
-    </button>
+function inferWhenChoice(initial?: Partial<NewChoreInput>): ChoreWhenChoice {
+  if (initial?.is_someday) return 'someday';
+  const dueOn = initial?.next_due_on;
+  if (!dueOn) return 'today';
+  if (dueOn === getTodayDateString()) return 'today';
+  return 'pick';
+}
+
+function inferRecurrence(
+  initial?: Partial<NewChoreInput>,
+): ChoreRecurrencePreset | null {
+  if (initial?.is_someday || !initial?.repeats) return null;
+  const preset = matchChoreFrequencyPreset(
+    true,
+    initial?.interval_value,
+    initial?.interval_unit,
   );
+  if (preset && preset !== 'someday') return preset;
+  return null;
 }
 
 export function ChoreForm({
@@ -102,8 +94,16 @@ export function ChoreForm({
   onCancel,
   onDelete,
 }: ChoreFormProps) {
-  const dateInputRef = useRef<HTMLInputElement>(null);
-  const initialRepeats = initial?.repeats ?? true;
+  const initialWhen = inferWhenChoice(initial);
+  const initialRecurrence = inferRecurrence(initial);
+  const initialHasRecurrence = Boolean(initial?.repeats && !initial?.is_someday);
+  const initialIntervalValue = initial?.interval_value ?? 1;
+  const initialIntervalUnit = initial?.interval_unit ?? 'weeks';
+  const initialPreset = matchChoreFrequencyPreset(
+    initialHasRecurrence,
+    initialIntervalValue,
+    initialIntervalUnit,
+  );
 
   const [title, setTitle] = useState(initial?.title ?? '');
   const [room, setRoom] = useState<string | null>(initial?.room ?? null);
@@ -113,15 +113,17 @@ export function ChoreForm({
   });
   const [newRoomMode, setNewRoomMode] = useState(false);
   const [newRoomValue, setNewRoomValue] = useState('');
-  const [repeats, setRepeats] = useState(initialRepeats);
-  const [intervalValue, setIntervalValue] = useState(initial?.interval_value ?? 1);
-  const [intervalUnit, setIntervalUnit] = useState<IntervalUnit>(
-    initial?.interval_unit ?? 'weeks',
+  const [whenChoice, setWhenChoice] = useState<ChoreWhenChoice>(
+    () => initialWhen ?? (mode === 'add' ? 'today' : 'someday'),
   );
-  const [dayOfWeek, setDayOfWeek] = useState<number | null>(initial?.day_of_week ?? null);
-  const [nextDueOn, setNextDueOn] = useState(initial?.next_due_on ?? '');
-  const [dueDateChoice, setDueDateChoice] = useState<DueDateChoice>(null);
-  const [nextDueOnDirty, setNextDueOnDirty] = useState(false);
+  const [recurrence, setRecurrence] = useState<ChoreRecurrencePreset | null>(
+    () => initialRecurrence ?? null,
+  );
+  const [pickedDueOn, setPickedDueOn] = useState<string | null>(() => {
+    if (initialWhen === 'pick' && initial?.next_due_on) return initial.next_due_on;
+    return null;
+  });
+  const dateInputRef = useRef<HTMLInputElement>(null);
   const initialMinutes = initial?.time_estimate_minutes ?? 25;
   const [timeEstimate, setTimeEstimate] = useState(initialMinutes);
   const [customEstimate, setCustomEstimate] = useState(() => {
@@ -133,22 +135,29 @@ export function ChoreForm({
   });
   const [submitting, setSubmitting] = useState(false);
 
-  const todayStr = getTodayDateString();
-  const coupleWeeksStr = getCoupleWeeksDateString();
-  const showDayPicker = repeats && intervalUnit === 'weeks' && intervalValue === 1;
-  const needsDueDateOnEdit = mode === 'edit' && repeats && !initialRepeats && !nextDueOn;
-  const showDueDateSection =
-    repeats && (mode === 'add' || needsDueDateOnEdit);
+  const isSomeday = whenChoice === 'someday';
+  const showRecurrence = !isSomeday;
+  const customFrequencyLabel =
+    showRecurrence && recurrence === null && initialHasRecurrence && initialPreset === null
+      ? formatIntervalLabel(initialIntervalValue, initialIntervalUnit)
+      : null;
+
+  const firstDueOn = useMemo(() => {
+    if (isSomeday) return '';
+    if (whenChoice === 'today') return getTodayDateString();
+    if (whenChoice === 'pick' && pickedDueOn) return pickedDueOn;
+    if (mode === 'edit' && initial?.next_due_on && whenChoice === initialWhen) {
+      return initial.next_due_on;
+    }
+    return '';
+  }, [isSomeday, whenChoice, pickedDueOn, mode, initial, initialWhen]);
 
   const dueDatePreview = useMemo(() => {
-    if (!repeats || !nextDueOn) return null;
-    return getDueDatePreview(nextDueOn);
-  }, [repeats, nextDueOn]);
+    if (isSomeday || !firstDueOn) return null;
+    return getDueDatePreview(firstDueOn);
+  }, [isSomeday, firstDueOn]);
 
-  const hasNextDueDate = Boolean(nextDueOn);
-  const canSubmit =
-    Boolean(title.trim()) &&
-    (mode === 'edit' || !repeats || hasNextDueDate);
+  const canSubmit = Boolean(title.trim()) && (isSomeday || Boolean(firstDueOn));
 
   const displayRooms = useMemo(() => {
     const names = new Set(existingRooms);
@@ -180,8 +189,39 @@ export function ChoreForm({
     return room ?? undefined;
   };
 
-  const toggleDay = (day: number) => {
-    setDayOfWeek((prev) => (prev === day ? null : day));
+  const openDatePicker = () => {
+    const input = dateInputRef.current;
+    if (!input) return;
+    if (typeof input.showPicker === 'function') {
+      input.showPicker();
+    } else {
+      input.click();
+    }
+  };
+
+  const handleWhenChange = (next: ChoreWhenChoice) => {
+    setWhenChoice(next);
+    if (next === 'someday') {
+      setRecurrence(null);
+      setPickedDueOn(null);
+    } else if (next === 'today') {
+      setPickedDueOn(null);
+    }
+  };
+
+  const handlePickDate = () => {
+    setWhenChoice('pick');
+    openDatePicker();
+  };
+
+  const handleDatePicked = (value: string) => {
+    if (!value) return;
+    setWhenChoice('pick');
+    setPickedDueOn(value);
+  };
+
+  const toggleRecurrence = (id: ChoreRecurrencePreset) => {
+    setRecurrence((current) => (current === id ? null : id));
   };
 
   const selectTimeChip = (minutes: number) => {
@@ -197,83 +237,53 @@ export function ChoreForm({
     }
   };
 
-  const handleRepeatsChange = (on: boolean) => {
-    setRepeats(on);
-    if (!on) {
-      setDayOfWeek(null);
+  const resolveInterval = (): { intervalValue: number; intervalUnit: IntervalUnit } | null => {
+    if (recurrence) {
+      const option = CHORE_RECURRENCE_OPTIONS.find((item) => item.id === recurrence)!;
+      return { intervalValue: option.interval_value, intervalUnit: option.interval_unit };
     }
-  };
-
-  const handleIntervalUnitChange = (unit: IntervalUnit) => {
-    setIntervalUnit(unit);
-    if (unit !== 'weeks' || intervalValue !== 1) {
-      setDayOfWeek(null);
+    if (mode === 'edit' && initialHasRecurrence && initialPreset === null) {
+      return { intervalValue: initialIntervalValue, intervalUnit: initialIntervalUnit };
     }
-  };
-
-  const handleIntervalValueChange = (value: number) => {
-    const next = Math.max(1, value);
-    setIntervalValue(next);
-    if (intervalUnit !== 'weeks' || next !== 1) {
-      setDayOfWeek(null);
-    }
-  };
-
-  const openDatePicker = () => {
-    const input = dateInputRef.current;
-    if (!input) return;
-    if (typeof input.showPicker === 'function') {
-      input.showPicker();
-    } else {
-      input.click();
-    }
-  };
-
-  const selectOverdueNow = () => {
-    setDueDateChoice('overdue');
-    setNextDueOn(todayStr);
-    if (mode === 'edit') setNextDueOnDirty(true);
-  };
-
-  const selectCoupleWeeks = () => {
-    setDueDateChoice('couple_weeks');
-    setNextDueOn(coupleWeeksStr);
-    if (mode === 'edit') setNextDueOnDirty(true);
-  };
-
-  const selectPickDate = () => {
-    setDueDateChoice('pick');
-    openDatePicker();
-  };
-
-  const handleDatePicked = (value: string) => {
-    setNextDueOn(value);
-    setDueDateChoice('pick');
-    if (mode === 'edit') setNextDueOnDirty(true);
+    return null;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
-    if (mode === 'add' && repeats && !nextDueOn) return;
+    if (submitting || !canSubmit) return;
 
     setSubmitting(true);
     try {
+      const normalizedTitle = normalizeChoreTitle(title);
+      const hasRecurrence = Boolean(recurrence);
+      const interval = hasRecurrence ? resolveInterval() : null;
+
       const base: NewChoreInput = {
-        title: title.trim(),
+        title: normalizedTitle,
         room: resolveRoom(),
         time_estimate_minutes: timeEstimate,
-        repeats,
-        interval_value: repeats ? intervalValue : undefined,
-        interval_unit: repeats ? intervalUnit : undefined,
-        day_of_week: showDayPicker ? dayOfWeek : null,
-        next_due_on: repeats ? nextDueOn : undefined,
+        is_someday: isSomeday,
+        repeats: hasRecurrence,
+        interval_value: interval?.intervalValue,
+        interval_unit: interval?.intervalUnit,
+        next_due_on: isSomeday ? undefined : firstDueOn,
       };
 
       if (mode === 'edit') {
+        const wasSomeday = initial?.is_someday === true;
+        const enablingSchedule = !isSomeday && wasSomeday;
+        const scheduleChanged =
+          recurrence !== initialPreset ||
+          whenChoice !== initialWhen ||
+          (whenChoice === 'pick' && pickedDueOn !== (initial?.next_due_on ?? null)) ||
+          (whenChoice === 'today' && initialWhen !== 'today');
+        const dueDateChanged =
+          whenChoice === 'pick' ? Boolean(pickedDueOn) : whenChoice === 'today';
+
         await onSubmit({
           ...base,
-          next_due_on_changed: nextDueOnDirty,
+          next_due_on_changed:
+            enablingSchedule || dueDateChanged || (scheduleChanged && !isSomeday),
         });
       } else {
         await onSubmit(base);
@@ -297,6 +307,8 @@ export function ChoreForm({
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder="Chore name"
+        autoComplete="off"
+        autoCorrect="off"
         autoFocus
         className="w-full rounded-full border border-[#D8D2C4] bg-[#FAF8F3] px-[14px] py-[14px] text-base text-[#3D3530] outline-none placeholder:text-[#938C7C] focus:border-[#3D3530] md:text-[15px]"
       />
@@ -352,143 +364,84 @@ export function ChoreForm({
       </div>
 
       <div className="mt-4">
-        <div className="mb-2 flex items-center justify-between gap-3">
-          <SectionLabel>Repeats</SectionLabel>
-          <ToggleSwitch checked={repeats} onChange={handleRepeatsChange} label="Repeats" />
+        <SectionLabel>
+          {mode === 'edit' && initialHasRecurrence && !isSomeday && whenChoice === initialWhen
+            ? "When's this due?"
+            : "When's this first due?"}
+        </SectionLabel>
+        <div className="flex flex-wrap gap-2">
+          <SelectChip selected={whenChoice === 'today'} onClick={() => handleWhenChange('today')}>
+            Today
+          </SelectChip>
+          <SelectChip
+            selected={whenChoice === 'pick'}
+            onClick={handlePickDate}
+          >
+            Pick a date
+          </SelectChip>
+          <SelectChip selected={whenChoice === 'someday'} onClick={() => handleWhenChange('someday')}>
+            Someday
+          </SelectChip>
         </div>
 
-        {!repeats ? (
-          <p className="text-[14px] font-normal text-[#938C7C] md:text-[13px]">
-            Someday — no due date, just tracked by room.
-          </p>
-        ) : (
-          <>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => handleIntervalValueChange(intervalValue - 1)}
-                disabled={intervalValue <= 1}
-                aria-label="Decrease interval"
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-[#D8D2C4] bg-white text-lg font-medium text-[#3D3530] disabled:opacity-40"
-              >
-                −
-              </button>
-              <span className="min-w-[2ch] text-center text-[17px] font-medium tabular-nums text-[#3D3530]">
-                {intervalValue}
-              </span>
-              <button
-                type="button"
-                onClick={() => handleIntervalValueChange(intervalValue + 1)}
-                aria-label="Increase interval"
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-[#D8D2C4] bg-white text-lg font-medium text-[#3D3530]"
-              >
-                +
-              </button>
-              <div className="flex flex-wrap gap-2">
-                {INTERVAL_UNITS.map(({ id, label }) => (
-                  <SelectChip
-                    key={id}
-                    selected={intervalUnit === id}
-                    onClick={() => handleIntervalUnitChange(id)}
-                  >
-                    {label}
-                  </SelectChip>
-                ))}
-              </div>
-            </div>
+        {whenChoice === 'pick' && pickedDueOn ? (
+          <button
+            type="button"
+            onClick={openDatePicker}
+            className="mt-2 w-full rounded-[12px] border border-[#D8D2C4] bg-[#FAF8F3] px-[14px] py-[14px] text-left text-base text-[#3D3530] md:text-[15px]"
+          >
+            {formatChoreDueDate(dateStringToISO(pickedDueOn))}
+          </button>
+        ) : null}
 
-            {showDayPicker ? (
-              <div className="mt-3">
-                <p className="mb-2 text-[12px] font-normal text-[#938C7C]">
-                  Optional day of week
-                </p>
-                <div className="flex gap-2">
-                  {DAY_LABELS.map((label, index) => (
-                    <button
-                      key={index}
-                      type="button"
-                      onClick={() => toggleDay(index)}
-                      aria-label={`${label} day of week`}
-                      aria-pressed={dayOfWeek === index}
-                      className={`flex h-8 w-8 items-center justify-center rounded-full text-[13px] font-medium transition-colors ${
-                        dayOfWeek === index
-                          ? 'bg-[#3D3530] text-white'
-                          : 'border border-[#D8D2C4] bg-white text-[#938C7C]'
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-          </>
-        )}
+        <input
+          ref={dateInputRef}
+          type="date"
+          value={pickedDueOn ?? getTodayDateString()}
+          onChange={(e) => handleDatePicked(e.target.value)}
+          className="fixed left-0 top-0 h-px w-px opacity-0"
+          tabIndex={-1}
+          aria-hidden
+        />
+
+        {isSomeday ? (
+          <p className="mt-2 text-[14px] font-normal text-[#938C7C] md:text-[13px]">
+            No due date yet — tracked by room until you schedule or complete it.
+          </p>
+        ) : null}
+
+        {!isSomeday && firstDueOn && dueDatePreview ? (
+          <p
+            className={`mt-3 text-[13px] font-normal md:text-[12px] ${
+              dueDatePreview.isOverdue ? 'text-[#C0463F]' : 'text-[#938C7C]'
+            }`}
+          >
+            {mode === 'edit' && initialHasRecurrence && whenChoice === initialWhen
+              ? `Next due ${formatChoreDueDate(dateStringToISO(firstDueOn)).toLowerCase()}`
+              : `First due ${formatChoreDueDate(dateStringToISO(firstDueOn)).toLowerCase()}`}
+            {dueDatePreview.isOverdue ? ' · overdue' : null}
+          </p>
+        ) : null}
       </div>
 
-      {showDueDateSection ? (
+      {showRecurrence ? (
         <div className="mt-4">
-          <SectionLabel>When&apos;s this next due?</SectionLabel>
+          <SectionLabel>How often after that?</SectionLabel>
           <div className="flex flex-wrap gap-2">
-            <SelectChip
-              selected={dueDateChoice === 'overdue' || nextDueOn === todayStr}
-              onClick={selectOverdueNow}
-            >
-              Overdue now
-            </SelectChip>
-            <SelectChip
-              selected={dueDateChoice === 'couple_weeks' || nextDueOn === coupleWeeksStr}
-              onClick={selectCoupleWeeks}
-            >
-              In a couple weeks
-            </SelectChip>
-            <SelectChip selected={dueDateChoice === 'pick'} onClick={selectPickDate}>
-              Pick a date
-            </SelectChip>
+            {CHORE_RECURRENCE_OPTIONS.map(({ id, label }) => (
+              <SelectChip
+                key={id}
+                selected={recurrence === id}
+                onClick={() => toggleRecurrence(id)}
+              >
+                {label}
+              </SelectChip>
+            ))}
           </div>
-          {hasNextDueDate ? (
-            <div className="mt-2 rounded-[12px] border border-[#D8D2C4] bg-[#FAF8F3] px-[14px] py-[14px] text-base text-[#3D3530] md:text-[15px]">
-              {formatChoreDueDate(dateStringToISO(nextDueOn))}
-            </div>
-          ) : (
-            <div className="mt-2 rounded-[12px] border border-dashed border-[#D8D2C4] bg-transparent px-[14px] py-[14px] text-center text-[14px] text-[#938C7C] md:text-[13px]">
-              Choose when this chore is next due
-            </div>
-          )}
-          {dueDatePreview ? (
-            <p
-              className={`mt-2 text-[14px] font-normal md:text-[13px] ${
-                dueDatePreview.isOverdue ? 'text-[#C0463F]' : 'text-[#4F7396]'
-              }`}
-            >
-              {dueDatePreview.label}
-            </p>
-          ) : null}
-          <input
-            ref={dateInputRef}
-            type="date"
-            value={nextDueOn}
-            onChange={(e) => handleDatePicked(e.target.value)}
-            className="fixed left-0 top-0 h-px w-px opacity-0"
-            tabIndex={-1}
-            aria-hidden
-          />
-        </div>
-      ) : null}
 
-      {mode === 'edit' && repeats && nextDueOn && !showDueDateSection ? (
-        <div className="mt-4">
-          <SectionLabel>Next due</SectionLabel>
-          <p className="text-[14px] font-normal text-[#3D3530] md:text-[13px]">
-            {formatChoreDueDate(dateStringToISO(nextDueOn))}
-          </p>
-          {dueDatePreview ? (
-            <p
-              className={`mt-1 text-[13px] font-normal md:text-[12px] ${
-                dueDatePreview.isOverdue ? 'text-[#C0463F]' : 'text-[#4F7396]'
-              }`}
-            >
-              {dueDatePreview.label}
+          {customFrequencyLabel ? (
+            <p className="mt-2 text-[13px] font-normal text-[#938C7C] md:text-[12px]">
+              Currently {customFrequencyLabel.toLowerCase()}. Pick an option above to change it.
             </p>
           ) : null}
         </div>
@@ -547,11 +500,6 @@ export function ChoreForm({
           </button>
         ) : null}
       </div>
-      {mode === 'add' && repeats && !hasNextDueDate ? (
-        <p className="mt-2 text-center text-[13px] font-normal text-[#938C7C] md:text-[12px]">
-          Set when this is next due to continue
-        </p>
-      ) : null}
       {saveError && mode === 'add' ? (
         <p className="mt-2 text-center text-[13px] font-normal text-[#C0463F] md:text-[12px]">
           {saveError}

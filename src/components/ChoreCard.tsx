@@ -4,10 +4,8 @@ import {
   getChoreDateSubtitle,
   getChoreDueStatus,
   getChoreIntervalLabel,
-  isChoreOverdue,
-  isChoreSomeday,
+  normalizeChoreTitle,
 } from '../lib/choreSchedule';
-import { PRIORITY_COLORS } from '../types';
 import type { Chore } from '../types';
 
 export interface ChoreCardProps {
@@ -30,15 +28,13 @@ export function ChoreCard({
   const [isTouchLike, setIsTouchLike] = useState(false);
   const [checkHovered, setCheckHovered] = useState(false);
 
-  const overdue = !isChoreSomeday(chore) && isChoreOverdue(chore);
-  const colors = overdue ? PRIORITY_COLORS.urgent : PRIORITY_COLORS.low;
+  const displayTitle = normalizeChoreTitle(chore.title);
   const status = getChoreDueStatus(chore);
+  const dateSubtitle = getChoreDateSubtitle(chore);
   const canComplete = Boolean(onComplete);
 
   const cardClassName = [
-    'group/card flex min-w-0 flex-1 flex-col gap-2.5 rounded-[12px] border px-[18px] pt-[18px] pb-[14px] transition-opacity duration-300 ease-out',
-    colors.bg,
-    colors.border,
+    'group/card flex min-w-0 flex-1 flex-col gap-2.5 rounded-[12px] border border-[#E4DFD3] bg-white px-[18px] pt-[18px] pb-[14px] transition-opacity duration-300 ease-out',
     isCompleting ? 'pointer-events-none opacity-0' : 'opacity-100',
   ]
     .filter(Boolean)
@@ -83,7 +79,7 @@ export function ChoreCard({
 
   const statusPillClass =
     status.kind === 'overdue'
-      ? 'bg-[#C0463F16] text-[#C0463F]'
+      ? 'bg-[#FBE4E2] text-[#A32D2D]'
       : status.kind === 'today'
         ? 'bg-[#4A7C5916] text-[#4A7C59]'
         : 'bg-[#938C7C16] text-[#938C7C]';
@@ -96,15 +92,14 @@ export function ChoreCard({
             type="button"
             onClick={handleComplete}
             disabled={!canComplete}
-            aria-label={`Mark ${chore.title} as done`}
+            aria-label={`Mark ${displayTitle} as done`}
             onMouseEnter={() => setCheckHovered(true)}
             onMouseLeave={() => setCheckHovered(false)}
             onTouchStart={stopTouchPropagation}
             onTouchEnd={stopTouchPropagation}
             onTouchMove={stopTouchPropagation}
             className={[
-              'group/time relative flex flex-col items-center justify-center',
-              colors.text,
+              'group/time relative flex flex-col items-center justify-center text-[#938C7C]',
               canComplete ? 'cursor-pointer' : '',
               isTouchLike && canComplete ? 'rounded-full border border-current/25 px-0.5 py-1' : '',
             ]
@@ -129,7 +124,7 @@ export function ChoreCard({
                 size={22}
                 strokeWidth={2}
                 aria-hidden
-                className={`absolute transition-opacity duration-100 ease ${colors.text} ${
+                className={`absolute text-[#938C7C] transition-opacity duration-100 ease ${
                   checkHovered ? 'opacity-100' : 'opacity-0 group-hover/card:opacity-60'
                 }`}
               />
@@ -137,7 +132,7 @@ export function ChoreCard({
           </button>
         </div>
 
-        <div className={`w-px shrink-0 self-stretch ${colors.line}`} aria-hidden />
+        <div className="w-px shrink-0 self-stretch bg-[#E4DFD3]" aria-hidden />
 
         <button
           type="button"
@@ -145,15 +140,13 @@ export function ChoreCard({
           className="min-w-0 flex-1 text-left"
         >
           <span className="block w-full whitespace-normal text-base font-normal leading-[1.35] text-[#211E19] md:text-[13px]">
-            {chore.title}
+            {displayTitle}
           </span>
-          <span
-            className={`mt-0.5 block text-[13px] font-normal leading-snug md:text-[11px] ${
-              overdue ? 'text-[#C0463F]' : 'text-[#938C7C]'
-            }`}
-          >
-            {getChoreDateSubtitle(chore)}
-          </span>
+          {dateSubtitle ? (
+            <span className="mt-0.5 block text-[13px] font-normal leading-snug text-[#938C7C] md:text-[11px]">
+              {dateSubtitle}
+            </span>
+          ) : null}
         </button>
       </div>
 
@@ -168,7 +161,7 @@ export function ChoreCard({
           <button
             type="button"
             onClick={handleEdit}
-            aria-label={`Edit ${chore.title}`}
+            aria-label={`Edit ${displayTitle}`}
             onTouchStart={stopTouchPropagation}
             onTouchEnd={stopTouchPropagation}
             onTouchMove={stopTouchPropagation}
@@ -179,7 +172,7 @@ export function ChoreCard({
           <button
             type="button"
             onClick={handleDelete}
-            aria-label={`Delete ${chore.title}`}
+            aria-label={`Delete ${displayTitle}`}
             onTouchStart={stopTouchPropagation}
             onTouchEnd={stopTouchPropagation}
             onTouchMove={stopTouchPropagation}

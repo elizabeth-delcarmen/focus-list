@@ -2,7 +2,7 @@ export type Priority = 'urgent' | 'high' | 'medium' | 'low';
 export type Status = 'todo' | 'in_progress' | 'done';
 export type View = 'today' | 'chores' | 'backlog';
 export type IntervalUnit = 'days' | 'weeks' | 'months';
-export type ChoreScheduleFilter = 'today' | 'weekly' | 'all' | 'someday';
+export type ChoreScheduleFilter = 'overdue' | 'today' | 'weekly' | 'all' | 'someday';
 export type ChoreViewMode = 'schedule' | 'room';
 export type DurationFilter = 'all' | 'quick' | 'medium' | 'deep';
 export type GroupMode = 'list' | 'category' | 'duration';
@@ -50,11 +50,14 @@ export interface NewChoreInput {
   title: string;
   room?: string;
   time_estimate_minutes: number;
+  /** Someday = no due date yet; distinct from a scheduled one-off */
+  is_someday?: boolean;
+  /** When scheduled, true if the chore repeats on an interval */
   repeats: boolean;
   interval_value?: number;
   interval_unit?: IntervalUnit;
   day_of_week?: number | null;
-  /** Initial due date (YYYY-MM-DD), required on add when repeats is true */
+  /** Initial due date (YYYY-MM-DD) for scheduled chores (one-off or recurring) */
   next_due_on?: string;
 }
 
@@ -69,12 +72,48 @@ export const INTERVAL_UNITS: { id: IntervalUnit; label: string }[] = [
   { id: 'months', label: 'Months' },
 ];
 
+export type ChoreRecurrencePreset = 'weekly' | 'biweekly' | 'monthly';
+export type ChoreWhenChoice = 'today' | 'pick' | 'someday';
+/** Recurrence choice when completing or scheduling a Someday chore */
+export type ChoreRecurrenceChoice = ChoreRecurrencePreset | 'one_off';
+
+export type ChoreFrequencyPreset = ChoreRecurrencePreset | 'someday';
+
+export const CHORE_RECURRENCE_OPTIONS: {
+  id: ChoreRecurrencePreset;
+  label: string;
+  interval_value: number;
+  interval_unit: IntervalUnit;
+}[] = [
+  { id: 'weekly', label: 'Weekly', interval_value: 1, interval_unit: 'weeks' },
+  { id: 'biweekly', label: 'Every 2 weeks', interval_value: 2, interval_unit: 'weeks' },
+  { id: 'monthly', label: 'Monthly', interval_value: 1, interval_unit: 'months' },
+];
+
+export const CHORE_FREQUENCY_OPTIONS: {
+  id: ChoreFrequencyPreset;
+  label: string;
+  repeats: boolean;
+  interval_value?: number;
+  interval_unit?: IntervalUnit;
+}[] = [
+  ...CHORE_RECURRENCE_OPTIONS.map(({ id, label, interval_value, interval_unit }) => ({
+    id,
+    label,
+    repeats: true as const,
+    interval_value,
+    interval_unit,
+  })),
+  { id: 'someday', label: 'Someday', repeats: false },
+];
+
 export const CHORE_VIEW_MODES: { id: ChoreViewMode; label: string }[] = [
   { id: 'schedule', label: 'By schedule' },
   { id: 'room', label: 'By room' },
 ];
 
 export const CHORE_SCHEDULE_FILTERS: { id: ChoreScheduleFilter; label: string }[] = [
+  { id: 'overdue', label: 'Overdue' },
   { id: 'today', label: 'Today' },
   { id: 'weekly', label: 'This week' },
   { id: 'all', label: 'All' },

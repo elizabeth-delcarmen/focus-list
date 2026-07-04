@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
+  applyRecurrenceChoiceToChoreChanges,
   computeNextDueAt,
   dateStringToISO,
+  deriveDayOfWeekForChore,
   getChoreInterval,
   isChoreSomeday,
+  normalizeChoreTitle,
 } from '../lib/choreSchedule';
 import { requireSupabase } from '../lib/supabase';
-import type { Chore, NewChoreInput } from '../types';
+import type { Chore, ChoreRecurrenceChoice, NewChoreInput } from '../types';
 
 interface UseChoresResult {
   chores: Chore[];
@@ -16,6 +19,7 @@ interface UseChoresResult {
   completeChore: (
     id: string,
     actualTimeMinutes?: number,
+    recurrenceChoice?: ChoreRecurrenceChoice,
   ) => Promise<{ chore: Chore; nextDueAt: string | null } | null>;
   updateChore: (id: string, changes: Partial<Chore>) => Promise<boolean>;
   deleteChore: (id: string) => Promise<void>;
@@ -62,30 +66,37 @@ export function useChores(userId: string | undefined): UseChoresResult {
     async (input: NewChoreInput): Promise<Chore | null> => {
       if (!userId) return null;
 
-      const isSomeday = !input.repeats;
-      if (!isSomeday && !input.next_due_on) {
-        setError('Set when this chore is next due.');
+      const isSomeday = input.is_someday === true;
+      const hasRecurrence =
+        input.repeats && input.interval_value != null && input.interval_unit != null;
+      const intervalValue = input.interval_value ?? 1;
+      const intervalUnit = input.interval_unit ?? 'weeks';
+      const nextDueOn = input.next_due_on;
+
+      if (!isSomeday && !nextDueOn) {
+        setError('Set when this chore is first due.');
         return null;
       }
 
       try {
         const client = requireSupabase();
-        const intervalValue = input.interval_value ?? 1;
-        const intervalUnit = input.interval_unit ?? 'weeks';
-        const showDayOfWeek =
-          !isSomeday && intervalUnit === 'weeks' && intervalValue === 1;
+
+        const dayOfWeek =
+          hasRecurrence && nextDueOn
+            ? deriveDayOfWeekForChore(intervalValue, intervalUnit, nextDueOn)
+            : null;
 
         const insertRow = {
           user_id: userId,
-          title: input.title,
+          title: normalizeChoreTitle(input.title),
           room: input.room?.trim() || null,
           time_estimate_minutes: input.time_estimate_minutes,
           recurrence_type: isSomeday ? ('someday' as const) : null,
-          interval_value: isSomeday ? null : intervalValue,
-          interval_unit: isSomeday ? null : intervalUnit,
-          day_of_week: showDayOfWeek ? input.day_of_week ?? null : null,
+          interval_value: hasRecurrence ? intervalValue : null,
+          interval_unit: hasRecurrence ? intervalUnit : null,
+          day_of_week: dayOfWeek,
           last_completed_at: null,
-          next_due_at: isSomeday ? null : dateStringToISO(input.next_due_on!),
+          next_due_at: isSomeday ? null : dateStringToISO(nextDueOn!),
         };
 
         const { data, error: insertError } = await client
@@ -122,6 +133,7 @@ export function useChores(userId: string | undefined): UseChoresResult {
     async (
       id: string,
       actualTimeMinutes?: number,
+      recurrenceChoice?: ChoreRecurrenceChoice,
     ): Promise<{ chore: Chore; nextDueAt: string | null } | null> => {
       const existing = chores.find((c) => c.id === id);
       if (!existing) return null;
@@ -130,16 +142,27 @@ export function useChores(userId: string | undefined): UseChoresResult {
       const isSomeday = isChoreSomeday(existing);
       const interval = getChoreInterval(existing);
 
-      const changes: Partial<Chore> = {
-        last_completed_at: lastCompletedAt,
-      };
-      if (!isSomeday && interval) {
-        changes.next_due_at = computeNextDueAt(
-          interval.value,
-          interval.unit,
-          lastCompletedAt,
-        );
+      let changes: Partial<Chore>;
+
+      if (isSomeday) {
+        if (!recurrenceChoice) {
+          setError('Choose whether this chore should repeat.');
+          return null;
+        }
+        changes = applyRecurrenceChoiceToChoreChanges(recurrenceChoice, lastCompletedAt);
+      } else {
+        changes = { last_completed_at: lastCompletedAt };
+        if (interval) {
+          changes.next_due_at = computeNextDueAt(
+            interval.value,
+            interval.unit,
+            lastCompletedAt,
+          );
+        } else {
+          changes.next_due_at = null;
+        }
       }
+
       if (actualTimeMinutes != null) {
         changes.actual_time_minutes = actualTimeMinutes;
       }
@@ -167,10 +190,15 @@ export function useChores(userId: string | undefined): UseChoresResult {
   );
 
   const updateChore = useCallback(async (id: string, changes: Partial<Chore>): Promise<boolean> => {
+    const payload =
+      changes.title != null
+        ? { ...changes, title: normalizeChoreTitle(changes.title) }
+        : changes;
+
     const client = requireSupabase();
     const { data, error: updateError } = await client
       .from('chores')
-      .update(changes)
+      .update(payload)
       .eq('id', id)
       .select()
       .single();

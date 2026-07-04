@@ -1,4 +1,11 @@
-import type { Chore, ChoreScheduleFilter, IntervalUnit } from '../types';
+import type {
+  Chore,
+  ChoreScheduleFilter,
+  ChoreFrequencyPreset,
+  ChoreRecurrenceChoice,
+  ChoreRecurrencePreset,
+  IntervalUnit,
+} from '../types';
 import { getTodayDateString } from '../types';
 
 const DAY_NAMES = [
@@ -17,6 +24,16 @@ export function getDayName(dayOfWeek: number): string {
 
 export function isChoreSomeday(chore: Chore): boolean {
   return chore.recurrence_type === 'someday';
+}
+
+/** Scheduled chore with a due date but no repeat interval */
+export function isChoreOneOff(chore: Chore): boolean {
+  return !isChoreSomeday(chore) && getChoreInterval(chore) == null;
+}
+
+/** One-off that was completed and should no longer appear in schedule filters */
+export function isChoreDismissed(chore: Chore): boolean {
+  return isChoreOneOff(chore) && !chore.next_due_at;
 }
 
 export function dateStringToISO(dateStr: string): string {
@@ -44,6 +61,105 @@ export function addDaysToDateString(dateStr: string, days: number): string {
   return `${result.year}-${String(result.month).padStart(2, '0')}-${String(result.day).padStart(2, '0')}`;
 }
 
+export function addIntervalToDateString(
+  dateStr: string,
+  value: number,
+  unit: IntervalUnit,
+): string {
+  const parts = addInterval(parseDateInput(dateStr), value, unit);
+  return `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`;
+}
+
+export function dayOfWeekFromDateString(dateStr: string): number {
+  const parts = parseDateInput(dateStr);
+  return new Date(parts.year, parts.month - 1, parts.day).getDay();
+}
+
+export function dayOfWeekFromDate(value: string | Date): number {
+  return dayOfWeekFromDateString(
+    typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+      ? value
+      : nextDueAtToDateString(typeof value === 'string' ? value : value.toISOString()) ??
+          getTodayDateString(),
+  );
+}
+
+export function getIntervalFromRecurrencePreset(
+  preset: ChoreRecurrencePreset,
+): { value: number; unit: IntervalUnit } {
+  switch (preset) {
+    case 'weekly':
+      return { value: 1, unit: 'weeks' };
+    case 'biweekly':
+      return { value: 2, unit: 'weeks' };
+    case 'monthly':
+      return { value: 1, unit: 'months' };
+  }
+}
+
+export function deriveDayOfWeekForChore(
+  intervalValue: number,
+  intervalUnit: IntervalUnit,
+  anchorDateStr: string,
+): number | null {
+  if (intervalUnit === 'weeks' && intervalValue === 1) {
+    return dayOfWeekFromDateString(anchorDateStr);
+  }
+  return null;
+}
+
+export function needsChoreRepeatPrompt(chore: Chore): boolean {
+  return isChoreSomeday(chore);
+}
+
+/** Apply recurrence choice after completing a Someday chore */
+export function applyRecurrenceChoiceToChoreChanges(
+  choice: ChoreRecurrenceChoice,
+  lastCompletedAt: string,
+): Partial<Chore> {
+  if (choice === 'one_off') {
+    return {
+      last_completed_at: lastCompletedAt,
+      recurrence_type: 'someday',
+      interval_value: null,
+      interval_unit: null,
+      day_of_week: null,
+      next_due_at: null,
+    };
+  }
+
+  const { value, unit } = getIntervalFromRecurrencePreset(choice);
+  const anchorDateStr = nextDueAtToDateString(lastCompletedAt) ?? getTodayDateString();
+
+  return {
+    last_completed_at: lastCompletedAt,
+    recurrence_type: null,
+    interval_value: value,
+    interval_unit: unit,
+    day_of_week: deriveDayOfWeekForChore(value, unit, anchorDateStr),
+    next_due_at: computeNextDueAt(value, unit, lastCompletedAt),
+  };
+}
+
+/** First due date for a new repeating chore from interval + optional weekday */
+export function computeInitialNextDueOn(
+  intervalValue: number,
+  intervalUnit: IntervalUnit,
+  dayOfWeek: number | null,
+  dueNow = false,
+): string {
+  const todayStr = getTodayDateString();
+  if (dueNow) return todayStr;
+
+  if (intervalUnit === 'weeks' && intervalValue === 1 && dayOfWeek != null) {
+    const todayParts = parseDateInput(todayStr);
+    const todayDow = new Date(todayParts.year, todayParts.month - 1, todayParts.day).getDay();
+    return addDaysToDateString(todayStr, dayOfWeek - todayDow);
+  }
+
+  return addIntervalToDateString(todayStr, intervalValue, intervalUnit);
+}
+
 export function formatChoreShortDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-GB', {
     day: 'numeric',
@@ -53,10 +169,19 @@ export function formatChoreShortDate(iso: string): string {
 
 export function getChoreDateSubtitle(chore: Chore): string {
   if (isChoreSomeday(chore)) {
-    if (!chore.last_completed_at) return 'Never done';
+    if (!chore.last_completed_at) return '';
     return `Last done ${formatChoreShortDate(chore.last_completed_at)}`;
   }
-  const due = formatChoreShortDate(chore.next_due_at!);
+  if (!chore.next_due_at) {
+    if (!chore.last_completed_at) return '';
+    return `Last done ${formatChoreShortDate(chore.last_completed_at)}`;
+  }
+  const due = formatChoreShortDate(chore.next_due_at);
+  if (isChoreOverdue(chore)) {
+    if (!chore.last_completed_at) return `Was due ${due}`;
+    const last = formatChoreShortDate(chore.last_completed_at);
+    return `Last done ${last} · was due ${due}`;
+  }
   if (!chore.last_completed_at) {
     return `Due ${due}`;
   }
@@ -200,6 +325,22 @@ export function isChoreDueThisWeekOrOverdue(chore: Chore): boolean {
   return dueDay <= todayDay + 7;
 }
 
+/** Due today through the next 7 days, excluding overdue */
+export function isChoreDueThisWeekIncludingToday(chore: Chore): boolean {
+  if (isChoreSomeday(chore) || !chore.next_due_at || isChoreOverdue(chore)) return false;
+  const dueDay = localDateToDayNumber(getLocalDateParts(chore.next_due_at));
+  const todayDay = localDateToDayNumber(getLocalDateParts(new Date()));
+  return dueDay >= todayDay && dueDay <= todayDay + 7;
+}
+
+/** Due in the next 7 days after today (excludes overdue and today) */
+export function isChoreDueLaterThisWeek(chore: Chore): boolean {
+  if (isChoreSomeday(chore) || !chore.next_due_at || isChoreOverdue(chore)) return false;
+  const dueDay = localDateToDayNumber(getLocalDateParts(chore.next_due_at));
+  const todayDay = localDateToDayNumber(getLocalDateParts(new Date()));
+  return dueDay > todayDay && dueDay <= todayDay + 7;
+}
+
 export function isChoreDueTodayOrOverdue(chore: Chore): boolean {
   if (isChoreSomeday(chore) || !chore.next_due_at) return false;
   return isChoreOverdue(chore) || isChoreDueToday(chore);
@@ -209,25 +350,35 @@ export function isChoreVisibleInScheduleFilter(
   chore: Chore,
   filter: ChoreScheduleFilter,
 ): boolean {
+  if (isChoreDismissed(chore)) {
+    return false;
+  }
+  if (filter === 'overdue') {
+    return isChoreOverdue(chore);
+  }
   if (filter === 'someday') {
     return isChoreSomeday(chore);
   }
   if (isChoreSomeday(chore)) {
     return false;
   }
+  if (isChoreOverdue(chore)) {
+    return false;
+  }
   if (filter === 'today') {
-    return isChoreDueTodayOrOverdue(chore);
+    return isChoreDueToday(chore);
   }
   if (filter === 'weekly') {
-    return isChoreDueThisWeekOrOverdue(chore);
+    return isChoreDueLaterThisWeek(chore);
   }
   return true;
 }
 
 export function getScheduleFilterForChore(chore: Chore): ChoreScheduleFilter {
   if (isChoreSomeday(chore)) return 'someday';
-  if (isChoreDueTodayOrOverdue(chore)) return 'today';
-  if (isChoreDueThisWeekOrOverdue(chore)) return 'weekly';
+  if (isChoreOverdue(chore)) return 'overdue';
+  if (isChoreDueToday(chore)) return 'today';
+  if (isChoreDueLaterThisWeek(chore)) return 'weekly';
   return 'all';
 }
 
@@ -238,12 +389,34 @@ export function pickScheduleFilterForChores(
   if (preferred && chores.some((c) => isChoreVisibleInScheduleFilter(c, preferred))) {
     return preferred;
   }
-  const filters: ChoreScheduleFilter[] = ['today', 'weekly', 'all', 'someday'];
+  const filters: ChoreScheduleFilter[] = ['overdue', 'today', 'weekly', 'all', 'someday'];
   return (
     filters.find((filter) => chores.some((c) => isChoreVisibleInScheduleFilter(c, filter))) ??
     preferred ??
-    'weekly'
+    'today'
   );
+}
+
+export function countChoresInScheduleFilter(
+  chores: Chore[],
+  filter: ChoreScheduleFilter,
+): number {
+  return chores.filter((c) => isChoreVisibleInScheduleFilter(c, filter)).length;
+}
+
+/** Trim and collapse accidental back-to-back title duplication (e.g. "foo foo" → "foo"). */
+export function normalizeChoreTitle(title: string): string {
+  const trimmed = title.trim();
+  if (!trimmed) return trimmed;
+
+  for (let i = 1; i < trimmed.length; i++) {
+    if (trimmed[i] !== ' ') continue;
+    const first = trimmed.slice(0, i);
+    const second = trimmed.slice(i + 1);
+    if (first === second) return first;
+  }
+
+  return trimmed;
 }
 
 export function getChoreDueStatus(chore: Chore): {
@@ -291,10 +464,22 @@ export function formatIntervalLabel(
   return `Every ${value} ${plural}`;
 }
 
+export function matchChoreFrequencyPreset(
+  repeats: boolean,
+  intervalValue?: number | null,
+  intervalUnit?: IntervalUnit | null,
+): ChoreFrequencyPreset | null {
+  if (!repeats) return null;
+  if (intervalUnit === 'weeks' && intervalValue === 1) return 'weekly';
+  if (intervalUnit === 'weeks' && intervalValue === 2) return 'biweekly';
+  if (intervalUnit === 'months' && intervalValue === 1) return 'monthly';
+  return null;
+}
+
 export function getChoreIntervalLabel(chore: Chore): string {
   if (isChoreSomeday(chore)) return 'Someday';
   const interval = getChoreInterval(chore);
-  if (!interval) return 'Repeating';
+  if (!interval) return 'One-off';
   return formatIntervalLabel(interval.value, interval.unit);
 }
 
@@ -350,23 +535,28 @@ export function groupChoresForScheduleView(
       : [];
   }
 
-  if (filter === 'all') {
+  if (filter === 'overdue') {
     const sorted = sortChoresByDue(chores);
     return sorted.length > 0 ? [{ label: '', chores: sorted }] : [];
   }
 
-  const overdue = sortChoresByDue(chores.filter(isChoreOverdue));
-  const overdueIds = new Set(overdue.map((c) => c.id));
-  const rest = sortChoresByDue(chores.filter((c) => !overdueIds.has(c.id)));
+  if (filter === 'all') {
+    const thisWeek = sortChoresByDue(chores.filter(isChoreDueThisWeekIncludingToday));
+    const thisWeekIds = new Set(thisWeek.map((c) => c.id));
+    const later = sortChoresByDue(chores.filter((c) => !thisWeekIds.has(c.id)));
 
-  const groups: ChoreGroup[] = [];
-  if (overdue.length > 0) {
-    groups.push({ label: 'Overdue', chores: overdue });
+    const groups: ChoreGroup[] = [];
+    if (thisWeek.length > 0) {
+      groups.push({ label: 'This week', chores: thisWeek });
+    }
+    if (later.length > 0) {
+      groups.push({ label: 'Later', chores: later });
+    }
+    return groups;
   }
-  if (rest.length > 0) {
-    groups.push({ label: '', chores: rest });
-  }
-  return groups;
+
+  const sorted = sortChoresByDue(chores);
+  return sorted.length > 0 ? [{ label: '', chores: sorted }] : [];
 }
 
 export function groupChoresByRoom(chores: Chore[]): ChoreGroup[] {
@@ -398,6 +588,10 @@ export function groupChoresByRoom(chores: Chore[]): ChoreGroup[] {
 
 export function countOverdueChores(chores: Chore[]): number {
   return chores.filter(isChoreOverdue).length;
+}
+
+export function getOverdueChores(chores: Chore[]): Chore[] {
+  return sortChoresByDue(chores.filter(isChoreOverdue));
 }
 
 export function getUniqueRooms(chores: Chore[]): string[] {

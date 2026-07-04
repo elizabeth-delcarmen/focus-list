@@ -1,17 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CalendarDays, Home } from 'lucide-react';
 import { AddChoreBottomSheet } from './AddChoreBottomSheet';
 import { AddTaskBottomSheet, type TaskDestination } from './AddTaskBottomSheet';
 import { AddTaskFab } from './AddTaskFab';
 import { AddTypeChooserSheet } from './AddTypeChooserSheet';
 import { ChoreCard } from './ChoreCard';
 import { ChoreForm } from './ChoreForm';
+import { ChoreRepeatPromptSheet } from './ChoreRepeatPromptSheet';
 import { FocusTimerScreen } from './FocusTimerScreen';
 import { TaskQueueSkeleton } from './Skeleton';
 import { useTimer } from '../hooks/useTimer';
 import {
   dateStringToISO,
+  countChoresInScheduleFilter,
   countOverdueChores,
+  deriveDayOfWeekForChore,
   formatNextDueInterval,
+  getChoreInterval,
   getScheduleFilterForChore,
   getUniqueRooms,
   groupChoresByRoom,
@@ -19,13 +24,14 @@ import {
   isChoreOverdue,
   isChoreSomeday,
   isChoreVisibleInScheduleFilter,
+  needsChoreRepeatPrompt,
   nextDueAtToDateString,
-  pickScheduleFilterForChores,
+  normalizeChoreTitle,
 } from '../lib/choreSchedule';
 import {
   CHORE_SCHEDULE_FILTERS,
-  CHORE_VIEW_MODES,
   type Chore,
+  type ChoreRecurrenceChoice,
   type ChoreScheduleFilter,
   type ChoreViewMode,
   type EditChoreInput,
@@ -35,6 +41,11 @@ import {
 } from '../types';
 
 const COMPLETE_ANIM_MS = 300;
+
+const FILTER_PILL_ACTIVE =
+  'border-[#3D3530] bg-[#3D3530] text-[#FAF8F3]';
+const FILTER_PILL_INACTIVE =
+  'border-[#D8D3C8] bg-transparent text-[#3D3530] hover:border-[#3D3530]/40';
 
 interface ChoresViewProps {
   chores: Chore[];
@@ -46,6 +57,7 @@ interface ChoresViewProps {
   onCompleteChore: (
     id: string,
     actualTimeMinutes?: number,
+    recurrenceChoice?: ChoreRecurrenceChoice,
   ) => Promise<{ chore: Chore; nextDueAt: string | null } | null>;
   onUpdateChore: (id: string, changes: Partial<Chore>) => Promise<boolean>;
   onDeleteChore: (id: string) => Promise<void>;
@@ -58,7 +70,7 @@ function choreToTimerTask(chore: Chore): Task {
   return {
     id: chore.id,
     user_id: chore.user_id,
-    title: chore.title,
+    title: normalizeChoreTitle(chore.title),
     estimate_minutes: chore.time_estimate_minutes,
     actual_minutes: chore.actual_time_minutes ?? 0,
     priority: isChoreOverdue(chore) ? 'urgent' : 'low',
@@ -84,7 +96,7 @@ export function ChoresView({
   existingCategories,
 }: ChoresViewProps) {
   const [viewMode, setViewMode] = useState<ChoreViewMode>('schedule');
-  const [scheduleFilter, setScheduleFilter] = useState<ChoreScheduleFilter>('weekly');
+  const [scheduleFilter, setScheduleFilter] = useState<ChoreScheduleFilter>('today');
   const [chooserOpen, setChooserOpen] = useState(false);
   const [taskSheetOpen, setTaskSheetOpen] = useState(false);
   const [choreSheetOpen, setChoreSheetOpen] = useState(false);
@@ -94,13 +106,14 @@ export function ChoresView({
   const [focusTimerExpanded, setFocusTimerExpanded] = useState(false);
   const [completionSubline, setCompletionSubline] = useState<string | undefined>();
   const [forceCompleted, setForceCompleted] = useState(false);
+  const [repeatPrompt, setRepeatPrompt] = useState<{
+    choreId: string;
+    actualMinutes?: number;
+  } | null>(null);
   const completingRef = useRef(false);
 
   const handleViewModeChange = (mode: ChoreViewMode) => {
     setViewMode(mode);
-    if (mode === 'schedule' && chores.length > 0) {
-      setScheduleFilter((current) => pickScheduleFilterForChores(chores, current));
-    }
   };
 
   const handleScheduleFilterChange = (filter: ChoreScheduleFilter) => {
@@ -114,31 +127,37 @@ export function ChoresView({
 
   useEffect(() => {
     if (!pendingScheduleFilter) return;
-    setViewMode('schedule');
     setScheduleFilter(pendingScheduleFilter);
     onPendingScheduleFilterApplied?.();
   }, [pendingScheduleFilter, onPendingScheduleFilterApplied]);
 
   const existingRooms = useMemo(() => getUniqueRooms(chores), [chores]);
 
-  const visibleChores = useMemo(() => {
-    if (viewMode === 'room') return chores;
-    return chores.filter((c) => isChoreVisibleInScheduleFilter(c, scheduleFilter));
-  }, [chores, viewMode, scheduleFilter]);
+  const totalOverdueCount = useMemo(() => countOverdueChores(chores), [chores]);
 
-  const overdueCount = useMemo(
-    () => countOverdueChores(visibleChores),
-    [visibleChores],
+  const filterCounts = useMemo(
+    () =>
+      Object.fromEntries(
+        CHORE_SCHEDULE_FILTERS.map(({ id }) => [id, countChoresInScheduleFilter(chores, id)]),
+      ) as Record<ChoreScheduleFilter, number>,
+    [chores],
   );
+
+  const filteredChores = useMemo(() => {
+    return chores.filter((c) => isChoreVisibleInScheduleFilter(c, scheduleFilter));
+  }, [chores, scheduleFilter]);
 
   const groupedChores = useMemo(() => {
     if (viewMode === 'room') {
-      return groupChoresByRoom(chores);
+      return groupChoresByRoom(filteredChores);
     }
-    return groupChoresForScheduleView(visibleChores, scheduleFilter);
-  }, [chores, visibleChores, viewMode, scheduleFilter]);
+    return groupChoresForScheduleView(filteredChores, scheduleFilter);
+  }, [filteredChores, viewMode, scheduleFilter]);
 
-  const timerTasks = useMemo(() => visibleChores.map(choreToTimerTask), [visibleChores]);
+  const timerTasks = useMemo(
+    () => filteredChores.map(choreToTimerTask),
+    [filteredChores],
+  );
 
   const handleSyncActualMinutes = useCallback(
     async (choreId: string, actualMinutes: number) => {
@@ -157,7 +176,7 @@ export function ChoresView({
   const timerActive = timer.isRunning || timer.isPaused;
 
   const activeChore = timer.activeTaskId
-    ? visibleChores.find((c) => c.id === timer.activeTaskId) ?? null
+    ? chores.find((c) => c.id === timer.activeTaskId) ?? null
     : null;
 
   const activeTimerTask = activeChore ? choreToTimerTask(activeChore) : null;
@@ -188,8 +207,12 @@ export function ChoresView({
     setChooserOpen(true);
   };
 
-  const handleCompleteChore = useCallback(
-    async (choreId: string, actualMinutes?: number) => {
+  const finishCompleteChore = useCallback(
+    async (
+      choreId: string,
+      actualMinutes?: number,
+      recurrenceChoice?: ChoreRecurrenceChoice,
+    ) => {
       if (completingRef.current) return;
 
       completingRef.current = true;
@@ -198,11 +221,12 @@ export function ChoresView({
       await new Promise((resolve) => setTimeout(resolve, COMPLETE_ANIM_MS));
 
       const wasTiming = timer.activeTaskId === choreId;
-      const chore = visibleChores.find((c) => c.id === choreId);
+      const chore = chores.find((c) => c.id === choreId);
 
       await onCompleteChore(
         choreId,
         actualMinutes ?? chore?.time_estimate_minutes,
+        recurrenceChoice,
       );
 
       if (wasTiming) {
@@ -214,7 +238,36 @@ export function ChoresView({
       setCompletingChoreId(null);
       completingRef.current = false;
     },
-    [timer, visibleChores, onCompleteChore],
+    [timer, chores, onCompleteChore],
+  );
+
+  const handleCompleteChore = useCallback(
+    async (
+      choreId: string,
+      actualMinutes?: number,
+      recurrenceChoice?: ChoreRecurrenceChoice,
+    ) => {
+      const chore = chores.find((c) => c.id === choreId);
+      if (!chore) return;
+
+      if (needsChoreRepeatPrompt(chore) && !recurrenceChoice) {
+        setRepeatPrompt({ choreId, actualMinutes });
+        return;
+      }
+
+      await finishCompleteChore(choreId, actualMinutes, recurrenceChoice);
+    },
+    [chores, finishCompleteChore],
+  );
+
+  const handleRepeatPromptSelect = useCallback(
+    (choice: ChoreRecurrenceChoice) => {
+      if (!repeatPrompt) return;
+      const { choreId, actualMinutes } = repeatPrompt;
+      setRepeatPrompt(null);
+      void finishCompleteChore(choreId, actualMinutes, choice);
+    },
+    [repeatPrompt, finishCompleteChore],
   );
 
   const handleStartChore = async (choreId: string) => {
@@ -261,38 +314,30 @@ export function ChoresView({
     if (!editingChoreId) return;
 
     const editingChore = chores.find((c) => c.id === editingChoreId);
-    const isSomeday = !values.repeats;
-    const wasSomeday = editingChore ? isChoreSomeday(editingChore) : false;
+    const isSomeday = values.is_someday === true;
+    const hasRecurrence =
+      values.repeats && values.interval_value != null && values.interval_unit != null;
     const intervalValue = values.interval_value ?? 1;
     const intervalUnit = values.interval_unit ?? 'weeks';
-    const showDayOfWeek = !isSomeday && intervalUnit === 'weeks' && intervalValue === 1;
+    const nextDueOn = values.next_due_on;
 
     const updatePayload: Partial<Chore> = {
-      title: values.title,
+      title: normalizeChoreTitle(values.title),
       room: values.room?.trim() || null,
       time_estimate_minutes: values.time_estimate_minutes,
       recurrence_type: isSomeday ? 'someday' : null,
-      interval_value: isSomeday ? null : intervalValue,
-      interval_unit: isSomeday ? null : intervalUnit,
-      day_of_week: showDayOfWeek ? values.day_of_week ?? null : null,
+      interval_value: hasRecurrence ? intervalValue : null,
+      interval_unit: hasRecurrence ? intervalUnit : null,
     };
 
     if (isSomeday) {
       updatePayload.next_due_at = null;
       updatePayload.day_of_week = null;
-    } else if (
-      wasSomeday &&
-      'next_due_on_changed' in values &&
-      values.next_due_on_changed &&
-      values.next_due_on
-    ) {
-      updatePayload.next_due_at = dateStringToISO(values.next_due_on);
-    } else if (
-      'next_due_on_changed' in values &&
-      values.next_due_on_changed &&
-      values.next_due_on
-    ) {
-      updatePayload.next_due_at = dateStringToISO(values.next_due_on);
+    } else if (nextDueOn) {
+      updatePayload.next_due_at = dateStringToISO(nextDueOn);
+      updatePayload.day_of_week = hasRecurrence
+        ? deriveDayOfWeekForChore(intervalValue, intervalUnit, nextDueOn)
+        : null;
     }
 
     const ok = await onUpdateChore(editingChoreId, updatePayload);
@@ -301,6 +346,17 @@ export function ChoresView({
     if (isSomeday) {
       setViewMode('schedule');
       setScheduleFilter('someday');
+    } else if (nextDueOn) {
+      setViewMode('schedule');
+      setScheduleFilter(
+        getScheduleFilterForChore({
+          ...(editingChore as Chore),
+          recurrence_type: null,
+          interval_value: hasRecurrence ? intervalValue : null,
+          interval_unit: hasRecurrence ? intervalUnit : null,
+          next_due_at: dateStringToISO(nextDueOn),
+        }),
+      );
     }
     setEditingChoreId(null);
   };
@@ -325,13 +381,13 @@ export function ChoresView({
           mode="edit"
           existingRooms={existingRooms}
           initial={{
-            title: chore.title,
+            title: normalizeChoreTitle(chore.title),
             room: chore.room ?? undefined,
             time_estimate_minutes: chore.time_estimate_minutes,
-            repeats: !isChoreSomeday(chore),
-            interval_value: chore.interval_value ?? 1,
-            interval_unit: chore.interval_unit ?? 'weeks',
-            day_of_week: chore.day_of_week ?? undefined,
+            is_someday: isChoreSomeday(chore),
+            repeats: Boolean(getChoreInterval(chore)),
+            interval_value: chore.interval_value ?? undefined,
+            interval_unit: chore.interval_unit ?? undefined,
             next_due_on: nextDueAtToDateString(chore.next_due_at) ?? undefined,
           }}
           submitLabel="Save changes"
@@ -357,7 +413,24 @@ export function ChoresView({
     );
   };
 
-  const anySheetOpen = chooserOpen || taskSheetOpen || choreSheetOpen;
+  const filteredEmptyMessage =
+    scheduleFilter === 'overdue'
+      ? 'No overdue chores'
+      : scheduleFilter === 'today'
+      ? 'Nothing due today'
+      : scheduleFilter === 'weekly'
+        ? 'Nothing due later this week'
+        : scheduleFilter === 'someday'
+          ? 'No someday chores yet'
+          : scheduleFilter === 'all'
+            ? 'No scheduled chores'
+            : 'No chores in this category';
+
+  const anySheetOpen = chooserOpen || taskSheetOpen || choreSheetOpen || repeatPrompt != null;
+
+  const repeatPromptChore = repeatPrompt
+    ? chores.find((c) => c.id === repeatPrompt.choreId)
+    : null;
 
   return (
     <>
@@ -380,67 +453,75 @@ export function ChoresView({
       ) : null}
 
       <div className="relative flex flex-col p-4 pb-24 sm:p-6 md:pb-6">
-        <div className="flex items-center gap-2">
-          <h1 className="text-[22px] font-semibold text-[#3D3530] md:text-xl">Chores</h1>
-          {overdueCount > 0 ? (
-            <span className="rounded-full bg-[#C0463F16] px-2.5 py-0.5 text-[13px] font-medium text-[#C0463F]">
-              {overdueCount} overdue
-            </span>
-          ) : null}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <h1 className="text-[22px] font-semibold text-[#3D3530] md:text-xl">Chores</h1>
+            {totalOverdueCount > 0 ? (
+              <button
+                type="button"
+                onClick={() => handleScheduleFilterChange('overdue')}
+                className="shrink-0 rounded-full bg-[#C0463F16] px-2.5 py-0.5 text-[13px] font-medium text-[#C0463F] transition-colors hover:bg-[#C0463F24]"
+              >
+                {totalOverdueCount} overdue
+              </button>
+            ) : null}
+          </div>
+
+          <div
+            className="flex shrink-0 rounded-full bg-[#EFEBE3] p-0.5"
+            role="group"
+            aria-label="Group chores by"
+          >
+            <button
+              type="button"
+              onClick={() => handleViewModeChange('schedule')}
+              aria-pressed={viewMode === 'schedule'}
+              className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-medium transition-colors ${
+                viewMode === 'schedule'
+                  ? 'bg-[#3D3530] text-[#FAF8F3]'
+                  : 'bg-transparent text-[#938C7C]'
+              }`}
+            >
+              <CalendarDays size={12} strokeWidth={2} aria-hidden />
+              Schedule
+            </button>
+            <button
+              type="button"
+              onClick={() => handleViewModeChange('room')}
+              aria-pressed={viewMode === 'room'}
+              className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-medium transition-colors ${
+                viewMode === 'room'
+                  ? 'bg-[#3D3530] text-[#FAF8F3]'
+                  : 'bg-transparent text-[#938C7C]'
+              }`}
+            >
+              <Home size={12} strokeWidth={2} aria-hidden />
+              Room
+            </button>
+          </div>
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
-          {CHORE_VIEW_MODES.map(({ id, label }) => (
+          {CHORE_SCHEDULE_FILTERS.map(({ id, label }) => (
             <button
               key={id}
               type="button"
-              onClick={() => handleViewModeChange(id)}
-              className={`rounded-full px-3 py-1 text-[15px] font-medium transition-colors md:text-xs ${
-                viewMode === id
-                  ? 'bg-accent text-white'
-                  : 'bg-surface-raised text-text-muted hover:text-text-primary'
+              onClick={() => handleScheduleFilterChange(id)}
+              className={`rounded-full border px-3 py-1 text-[15px] font-medium transition-colors md:text-xs ${
+                scheduleFilter === id ? FILTER_PILL_ACTIVE : FILTER_PILL_INACTIVE
               }`}
             >
-              {label}
+              {label} · {filterCounts[id]}
             </button>
           ))}
         </div>
 
-        {viewMode === 'schedule' ? (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {CHORE_SCHEDULE_FILTERS.map(({ id, label }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => handleScheduleFilterChange(id)}
-                className={`rounded-full px-3 py-1 text-[15px] font-medium transition-colors md:text-xs ${
-                  scheduleFilter === id
-                    ? 'bg-accent text-white'
-                    : 'bg-surface-raised text-text-muted hover:text-text-primary'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        ) : null}
-
         <div className="mt-6">
           {loading ? (
             <TaskQueueSkeleton />
-          ) : visibleChores.length === 0 ? (
+          ) : filteredChores.length === 0 ? (
             <p className="py-4 text-center text-base text-text-faint md:text-sm">
-              {viewMode === 'room'
-                ? 'No chores yet'
-                : scheduleFilter === 'today'
-                  ? 'Nothing due today'
-                  : scheduleFilter === 'weekly'
-                    ? 'Nothing due this week'
-                    : scheduleFilter === 'someday'
-                      ? 'No someday chores yet'
-                      : scheduleFilter === 'all'
-                        ? 'No chores yet'
-                        : 'No chores in this category'}
+              {filteredEmptyMessage}
             </p>
           ) : (
             <div className="space-y-6">
@@ -493,6 +574,21 @@ export function ChoresView({
         saveError={choresError}
         onChoreAdded={handleChoreAdded}
       />
+
+      {repeatPromptChore ? (
+        <ChoreRepeatPromptSheet
+          open={repeatPrompt != null}
+          choreTitle={normalizeChoreTitle(repeatPromptChore.title)}
+          onSelect={handleRepeatPromptSelect}
+          onClose={() => {
+            setRepeatPrompt(null);
+            if (repeatPrompt && timer.activeTaskId === repeatPrompt.choreId) {
+              setForceCompleted(false);
+              setCompletionSubline(undefined);
+            }
+          }}
+        />
+      ) : null}
 
       <AddTaskFab
         onClick={openChooser}
