@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { lockBodyScroll, unlockBodyScroll } from '../lib/bodyScrollLock';
 
 interface BottomSheetProps {
   open: boolean;
@@ -42,13 +43,10 @@ export function BottomSheet({
   }, [open]);
 
   useEffect(() => {
-    if (!mounted) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [mounted]);
+    if (!open) return;
+    lockBodyScroll();
+    return () => unlockBodyScroll();
+  }, [open]);
 
   const handleTouchStart = (event: React.TouchEvent) => {
     if (!swipeToDismiss) return;

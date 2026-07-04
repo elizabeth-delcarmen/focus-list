@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, ChevronDown, List, Pause, Play } from 'lucide-react';
+import { lockBodyScroll, unlockBodyScroll } from '../lib/bodyScrollLock';
 import { FocusTimerDial } from './FocusTimerDial';
 import { TaskSwitcherSheet } from './TaskSwitcherSheet';
 import type { NewTaskInput, Task } from '../types';
@@ -43,10 +44,8 @@ export function FocusTimerScreen({
 
   useEffect(() => {
     if (!isCompleted) return;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = '';
-    };
+    lockBodyScroll();
+    return () => unlockBodyScroll();
   }, [isCompleted]);
 
   const content = (

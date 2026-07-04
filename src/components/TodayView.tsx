@@ -8,7 +8,7 @@ import { RunOverNudge } from './RunOverNudge';
 import { TaskQueue } from './TaskQueue';
 import { UndoToast } from './UndoToast';
 import { useTimer } from '../hooks/useTimer';
-import { getTodayCompletedTasks, getUniqueCategories, type NewChoreInput, type NewTaskInput, type Task } from '../types';
+import { getTodayCompletedTasks, getUniqueCategories, type Chore, type NewChoreInput, type NewTaskInput, type Task } from '../types';
 
 const COMPLETE_ANIM_MS = 300;
 
@@ -23,7 +23,8 @@ interface TodayViewProps {
   reorderTasks: (newOrder: Task[]) => Promise<void>;
   addTodayTask: (task: NewTaskInput) => Promise<Task | null>;
   addBacklogTask: (task: NewTaskInput) => Promise<Task | null>;
-  addChore?: (chore: NewChoreInput) => Promise<unknown>;
+  addChore?: (chore: NewChoreInput) => Promise<Chore | null>;
+  onChoreAdded?: (chore: Chore) => void;
   existingRooms?: string[];
   onNavigateToBacklog?: () => void;
 }
@@ -40,6 +41,7 @@ export function TodayView({
   addTodayTask,
   addBacklogTask,
   addChore,
+  onChoreAdded,
   existingRooms = [],
   onNavigateToBacklog,
 }: TodayViewProps) {
@@ -299,6 +301,7 @@ export function TodayView({
           existingRooms={existingRooms}
           onClose={() => setChoreSheetOpen(false)}
           onAddChore={addChore}
+          onChoreAdded={onChoreAdded}
         />
       ) : null}
 

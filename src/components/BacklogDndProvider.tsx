@@ -60,7 +60,7 @@ export function BacklogDndProvider({
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 500, tolerance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 450, tolerance: 20 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
@@ -150,8 +150,7 @@ export function BacklogDndProvider({
             <div className="pointer-events-none pl-4">
               <TaskCard
                 task={activeDragTask}
-                isSelected={false}
-                isTimerActive={false}
+                isCompleting={false}
                 actionLabel="Plan"
                 showCategory
                 isDragOverlay

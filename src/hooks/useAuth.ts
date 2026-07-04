@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
+import { completeAuthFromCurrentUrl, completeAuthFromUrl } from '../lib/authCallback';
 import { isSupabaseConfigured, requireSupabase } from '../lib/supabase';
 
-const REDIRECT_URL =
-  import.meta.env.VITE_APP_URL ?? (typeof window !== 'undefined' ? window.location.origin : '');
+function getRedirectUrl(): string {
+  if (typeof window !== 'undefined') {
+    return window.location.origin;
+  }
+  return import.meta.env.VITE_APP_URL ?? '';
+}
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -15,17 +20,9 @@ export function useAuth() {
 
     const client = requireSupabase();
 
-    const handleMagicLinkCallback = async () => {
-      const params = new URLSearchParams(window.location.search);
-      const code = params.get('code');
-      if (!code) return;
-
-      const { error } = await client.auth.exchangeCodeForSession(code);
+    void completeAuthFromCurrentUrl(client).then(({ error }) => {
       if (error) console.error('Auth callback error:', error.message);
-      window.history.replaceState({}, '', window.location.pathname);
-    };
-
-    void handleMagicLinkCallback();
+    });
 
     const {
       data: { subscription },
@@ -39,7 +36,7 @@ export function useAuth() {
   }, []);
 
   const signInWithMagicLink = useCallback(async (email: string) => {
-    const redirectTo = REDIRECT_URL || window.location.origin;
+    const redirectTo = getRedirectUrl();
     const { error } = await requireSupabase().auth.signInWithOtp({
       email,
       options: {
@@ -49,10 +46,23 @@ export function useAuth() {
     if (error) throw error;
   }, []);
 
+  const signInWithMagicLinkUrl = useCallback(async (url: string) => {
+    const { error } = await completeAuthFromUrl(requireSupabase(), url);
+    if (error) throw error;
+    window.history.replaceState({}, '', window.location.pathname);
+  }, []);
+
   const signOut = useCallback(async () => {
     const { error } = await requireSupabase().auth.signOut();
     if (error) throw error;
   }, []);
 
-  return { user, session, loading, signInWithMagicLink, signOut };
+  return {
+    user,
+    session,
+    loading,
+    signInWithMagicLink,
+    signInWithMagicLinkUrl,
+    signOut,
+  };
 }

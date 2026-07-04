@@ -56,6 +56,13 @@ const GROUP_MODES: { id: GroupMode; label: string }[] = [
 
 type DropTarget = { id: string; position: 'before' | 'after' };
 
+function getTaskActionLabel(task: Task, timerTaskId: string | null): 'Start' | 'In progress' {
+  if (timerTaskId === task.id || task.status === 'in_progress') {
+    return 'In progress';
+  }
+  return 'Start';
+}
+
 function mergeReorderedVisible(allTasks: Task[], visible: Task[], reordered: Task[]): Task[] {
   const visibleIds = new Set(visible.map((t) => t.id));
   const reorderedIds = new Set(reordered.map((t) => t.id));
@@ -108,7 +115,6 @@ function insertIntoCategoryGroup(
 interface TaskQueueProps {
   tasks: Task[];
   completedTasks: Task[];
-  selectedTaskId: string | null;
   timerTaskId: string | null;
   completingTaskId: string | null;
   loading?: boolean;
@@ -124,7 +130,6 @@ interface TaskQueueProps {
 export function TaskQueue({
   tasks,
   completedTasks,
-  selectedTaskId,
   timerTaskId,
   completingTaskId,
   loading = false,
@@ -144,7 +149,7 @@ export function TaskQueue({
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 500, tolerance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 450, tolerance: 20 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
@@ -327,10 +332,9 @@ export function TaskQueue({
           <SortableTaskCard
             key={task.id}
             task={task}
-            isSelected={task.id === selectedTaskId}
-            isTimerActive={task.id === timerTaskId}
             isCompleting={task.id === completingTaskId}
             showCategory={showCategoryOnCard}
+            actionLabel={getTaskActionLabel(task, timerTaskId)}
             showDropLineBefore={
               dropTarget?.id === task.id && dropTarget.position === 'before'
             }
@@ -347,10 +351,9 @@ export function TaskQueue({
           <TaskCard
             key={task.id}
             task={task}
-            isSelected={task.id === selectedTaskId}
-            isTimerActive={task.id === timerTaskId}
             isCompleting={task.id === completingTaskId}
             showCategory={showCategoryOnCard}
+            actionLabel={getTaskActionLabel(task, timerTaskId)}
             onSelect={onSelectTask}
             onStart={onStartTask}
             onEdit={setEditingTaskId}
@@ -486,9 +489,9 @@ export function TaskQueue({
             <div className="pointer-events-none pl-4">
               <TaskCard
                 task={activeDragTask}
-                isSelected={activeDragTask.id === selectedTaskId}
-                isTimerActive={activeDragTask.id === timerTaskId}
+                isCompleting={false}
                 showCategory={groupMode !== 'category'}
+                actionLabel={getTaskActionLabel(activeDragTask, timerTaskId)}
                 isDragOverlay
                 onSelect={() => {}}
                 onStart={() => {}}

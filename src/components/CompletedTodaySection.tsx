@@ -5,9 +5,10 @@ import type { Task } from '../types';
 
 interface CompletedTodaySectionProps {
   tasks: Task[];
+  title?: string;
 }
 
-export function CompletedTodaySection({ tasks }: CompletedTodaySectionProps) {
+export function CompletedTodaySection({ tasks, title = 'Completed today' }: CompletedTodaySectionProps) {
   const [open, setOpen] = useState(false);
 
   if (tasks.length === 0) return null;
@@ -20,7 +21,7 @@ export function CompletedTodaySection({ tasks }: CompletedTodaySectionProps) {
         className="flex w-full items-center justify-between rounded-full px-1 py-1 text-left transition-colors hover:text-text-primary"
       >
         <span className="text-[13px] font-medium uppercase tracking-wide text-text-faint md:text-[11px]">
-          Completed today
+          {title}
           <span className="ml-2 text-base normal-case text-text-muted md:text-sm">({tasks.length})</span>
         </span>
         <ChevronDown

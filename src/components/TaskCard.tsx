@@ -8,11 +8,9 @@ import type { Task } from '../types';
 
 export interface TaskCardProps {
   task: Task;
-  isSelected: boolean;
-  isTimerActive: boolean;
   isCompleting?: boolean;
   showCategory?: boolean;
-  actionLabel?: 'Start' | 'Plan';
+  actionLabel?: 'Start' | 'Plan' | 'In progress';
   planningMode?: boolean;
   planSelected?: boolean;
   onPlanToggle?: (taskId: string) => void;
@@ -29,8 +27,6 @@ export interface TaskCardProps {
 
 export function TaskCard({
   task,
-  isSelected,
-  isTimerActive,
   isCompleting = false,
   showCategory = true,
   actionLabel = 'Start',
@@ -51,11 +47,17 @@ export function TaskCard({
   const colors = PRIORITY_COLORS[task.priority];
   const canComplete = Boolean(onComplete) && !isDragOverlay && !planningMode;
 
-  const stateClass = isTimerActive
-    ? 'ring-2 ring-text-primary shadow-sm'
-    : isSelected
-      ? 'ring-2 ring-medium'
-      : '';
+  const cardClassName = [
+    'group/card flex min-w-0 flex-1 flex-col gap-2.5 rounded-[12px] border px-[18px] pt-[18px] pb-[14px] transition-opacity duration-300 ease-out',
+    colors.bg,
+    colors.border,
+    isDragOverlay ? 'scale-[1.02] shadow-[0_8px_24px_rgba(33,30,25,0.18)]' : '',
+    isDragPlaceholder ? 'opacity-0' : '',
+    isCompleting && !isDragOverlay ? 'pointer-events-none opacity-0' : '',
+    !isDragOverlay && !isCompleting && !isDragPlaceholder ? 'opacity-100' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   useEffect(() => {
     const mq = window.matchMedia('(hover: none), (pointer: coarse)');
@@ -106,19 +108,6 @@ export function TaskCard({
   const actionIconVisibility = isTouchLike
     ? 'opacity-70 pointer-events-auto'
     : 'pointer-events-none opacity-0 group-hover/card:pointer-events-auto group-hover/card:opacity-70';
-
-  const cardClassName = [
-    'group/card flex min-w-0 flex-1 flex-col gap-2.5 rounded-[12px] border px-[18px] pt-[18px] pb-[14px] transition-opacity duration-300 ease-out',
-    colors.bg,
-    colors.border,
-    stateClass,
-    isDragOverlay ? 'scale-[1.02] shadow-[0_8px_24px_rgba(33,30,25,0.18)]' : '',
-    isDragPlaceholder ? 'opacity-0' : '',
-    isCompleting && !isDragOverlay ? 'pointer-events-none opacity-0' : '',
-    !isDragOverlay && !isCompleting && !isDragPlaceholder ? 'opacity-100' : '',
-  ]
-    .filter(Boolean)
-    .join(' ');
 
   return (
     <div data-task-interactive="" className={cardClassName}>
@@ -238,7 +227,13 @@ export function TaskCard({
                 type="button"
                 onClick={() => onStart(task.id)}
                 disabled={isDragOverlay}
-                aria-label={`${actionLabel === 'Plan' ? 'Plan' : 'Start focus on'} ${task.title}`}
+                aria-label={
+                  actionLabel === 'Plan'
+                    ? `Plan ${task.title}`
+                    : actionLabel === 'In progress'
+                      ? `${task.title} is in progress`
+                      : `Start focus on ${task.title}`
+                }
                 className={`ml-0.5 shrink-0 rounded-full border px-[10px] py-1 text-[14px] font-normal md:text-[11px] ${colors.text} ${colors.bg} ${colors.border}`}
                 onTouchStart={stopTouchPropagation}
                 onTouchEnd={stopTouchPropagation}

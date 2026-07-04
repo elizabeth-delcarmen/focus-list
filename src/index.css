@@ -75,3 +75,7 @@ body {
     font-size: 16px;
   }
 }
+
+.touch-pan-y {
+  touch-action: pan-y;
+}

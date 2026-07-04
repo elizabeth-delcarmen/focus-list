@@ -1,0 +1,19 @@
+{
+  "name": "Focus List",
+  "short_name": "Focus List",
+  "description": "Daily task planning with focus timers",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F5F3EE",
+  "theme_color": "#3D7A4F",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/vite.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

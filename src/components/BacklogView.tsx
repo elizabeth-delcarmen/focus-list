@@ -10,7 +10,7 @@ import { SortableTaskCard } from './TaskCard';
 import { TaskForm } from './TaskForm';
 import { TaskQueueSkeleton } from './Skeleton';
 import { UndoToast } from './UndoToast';
-import { getUniqueCategories, type NewChoreInput, type NewTaskInput, type Task, type TaskFormValues } from '../types';
+import { getUniqueCategories, type Chore, type NewChoreInput, type NewTaskInput, type Task, type TaskFormValues } from '../types';
 
 interface BacklogViewProps {
   tasks: Task[];
@@ -18,7 +18,8 @@ interface BacklogViewProps {
   loading?: boolean;
   onAddTask: (input: NewTaskInput) => Promise<Task | null>;
   onAddToToday: (input: NewTaskInput) => Promise<Task | null>;
-  onAddChore?: (input: NewChoreInput) => Promise<unknown>;
+  onAddChore?: (input: NewChoreInput) => Promise<Chore | null>;
+  onChoreAdded?: (chore: Chore) => void;
   existingRooms?: string[];
   onUpdateTask: (id: string, changes: Partial<Task>) => Promise<void>;
   onDeleteTask: (id: string) => Promise<void>;
@@ -35,6 +36,7 @@ export function BacklogView({
   onAddTask,
   onAddToToday,
   onAddChore,
+  onChoreAdded,
   existingRooms = [],
   onUpdateTask,
   onDeleteTask,
@@ -177,7 +179,7 @@ export function BacklogView({
     <div
       className={`relative flex flex-1 flex-col p-4 sm:p-6 ${planningMode ? 'pb-28 md:pb-6' : 'pb-24 md:pb-6'}`}
     >
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+      <div>
         <Button
           variant="secondary"
           onClick={handlePlanMyDay}
@@ -185,14 +187,6 @@ export function BacklogView({
           className="w-full justify-center md:w-auto"
         >
           Plan my day →
-        </Button>
-        <Button
-          variant="secondary"
-          onClick={openChooser}
-          disabled={planningMode}
-          className="hidden font-semibold md:inline-flex"
-        >
-          + New task
         </Button>
       </div>
 
@@ -248,10 +242,11 @@ export function BacklogView({
           existingRooms={existingRooms}
           onClose={() => setChoreSheetOpen(false)}
           onAddChore={onAddChore}
+          onChoreAdded={onChoreAdded}
         />
       ) : null}
 
-      <AddTaskFab onClick={openChooser} hidden={planningMode || anySheetOpen} />
+      <AddTaskFab onClick={openChooser} showOnDesktop hidden={planningMode || anySheetOpen} />
 
       {planningMode ? (
         <div className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-40 border-t border-border bg-surface px-4 py-3 md:static md:mt-6 md:rounded-[12px] md:border md:px-4 md:py-3">
