@@ -11,18 +11,23 @@ export function TaskCardSkeleton() {
   return (
     <div className="flex items-stretch">
       <div className="hidden w-4 shrink-0 md:block" aria-hidden />
-      <div className="flex min-w-0 flex-1 items-center gap-[14px] rounded-[12px] border border-border bg-surface px-4 py-[14px]">
-        <div className="flex w-10 shrink-0 flex-col items-center gap-1">
-          <SkeletonBlock className="h-6 w-7 rounded" />
-          <SkeletonBlock className="h-2 w-5 rounded" />
+      <div className="flex min-w-0 flex-1 flex-col gap-2.5 rounded-[12px] border border-border bg-surface px-[18px] pt-[18px] pb-[14px]">
+        <div className="flex items-stretch gap-3">
+          <div className="flex w-11 shrink-0 flex-col items-center gap-1">
+            <SkeletonBlock className="h-6 w-7 rounded" />
+            <SkeletonBlock className="h-2 w-5 rounded" />
+          </div>
+          <SkeletonBlock className="h-8 w-px shrink-0 self-stretch rounded-none" />
+          <SkeletonBlock className="h-4 min-w-0 flex-1 max-w-[72%]" />
         </div>
-        <SkeletonBlock className="h-9 w-px shrink-0 rounded-none" />
-        <div className="flex min-w-0 flex-1 flex-col gap-2">
-          <SkeletonBlock className="h-4 w-[72%] max-w-[220px]" />
+        <div className="flex items-center justify-between gap-2">
           <SkeletonBlock className="h-5 w-20 rounded-full" />
+          <div className="flex items-center gap-1">
+            <SkeletonBlock className="h-7 w-7 shrink-0 rounded-full" />
+            <SkeletonBlock className="h-7 w-7 shrink-0 rounded-full" />
+            <SkeletonBlock className="h-7 w-[52px] shrink-0 rounded-full" />
+          </div>
         </div>
-        <SkeletonBlock className="h-7 w-7 shrink-0 rounded-full" />
-        <SkeletonBlock className="h-7 w-[52px] shrink-0 rounded-full" />
       </div>
     </div>
   );

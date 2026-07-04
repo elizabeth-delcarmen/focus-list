@@ -108,7 +108,7 @@ export function TaskCard({
     : 'pointer-events-none opacity-0 group-hover/card:pointer-events-auto group-hover/card:opacity-70';
 
   const cardClassName = [
-    'group/card flex min-w-0 flex-1 items-center gap-[14px] rounded-[12px] border px-4 py-[14px] transition-opacity duration-300 ease-out',
+    'group/card flex min-w-0 flex-1 flex-col gap-2.5 rounded-[12px] border px-[18px] pt-[18px] pb-[14px] transition-opacity duration-300 ease-out',
     colors.bg,
     colors.border,
     stateClass,
@@ -122,125 +122,134 @@ export function TaskCard({
 
   return (
     <div data-task-interactive="" className={cardClassName}>
-      {planningMode ? (
-        <button
-          type="button"
-          onClick={handlePlanCheckbox}
-          aria-label={planSelected ? `Deselect ${task.title}` : `Select ${task.title}`}
-          aria-pressed={planSelected}
-          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
-            planSelected ? 'border-accent bg-accent' : 'border-border'
-          }`}
-        >
-          {planSelected ? (
-            <span className="h-2 w-2 rounded-full bg-white" aria-hidden />
-          ) : null}
-        </button>
-      ) : null}
-
-      <button
-        type="button"
-        onClick={handleComplete}
-        disabled={!canComplete}
-        aria-label={`Mark ${task.title} as done`}
-        onMouseEnter={() => setCheckHovered(true)}
-        onMouseLeave={() => setCheckHovered(false)}
-        onTouchStart={stopTouchPropagation}
-        onTouchEnd={stopTouchPropagation}
-        onTouchMove={stopTouchPropagation}
-        className={[
-          'group/time relative flex w-10 shrink-0 flex-col items-center justify-center',
-          colors.text,
-          canComplete ? 'cursor-pointer' : '',
-          isTouchLike && canComplete ? 'rounded-full border border-current/25 px-0.5 py-1' : '',
-        ]
-          .filter(Boolean)
-          .join(' ')}
-      >
-        <div
-          className={`flex flex-col items-center transition-opacity duration-100 ease ${
-            !isTouchLike && canComplete ? 'group-hover/card:opacity-0' : ''
-          }`}
-        >
-          <span className="text-[22px] font-bold tabular-nums leading-none md:text-[20px]">
-            {task.estimate_minutes}
-          </span>
-          <span className="mt-0.5 text-[11px] font-medium uppercase tracking-[0.06em] opacity-70">
-            min
-          </span>
-        </div>
-
-        {!isTouchLike && canComplete ? (
-          <CircleCheck
-            size={22}
-            strokeWidth={2}
-            aria-hidden
-            className={`absolute transition-opacity duration-100 ease ${colors.text} ${
-              checkHovered ? 'opacity-100' : 'opacity-0 group-hover/card:opacity-60'
+      <div className="flex items-stretch gap-3">
+        {planningMode ? (
+          <button
+            type="button"
+            onClick={handlePlanCheckbox}
+            aria-label={planSelected ? `Deselect ${task.title}` : `Select ${task.title}`}
+            aria-pressed={planSelected}
+            className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center self-start rounded-full border-2 transition-colors ${
+              planSelected ? 'border-accent bg-accent' : 'border-border'
             }`}
-          />
-        ) : null}
-      </button>
-
-      <div className={`h-9 w-px shrink-0 ${colors.line}`} aria-hidden />
-
-      <button
-        type="button"
-        onClick={handleSelect}
-        disabled={isDragOverlay}
-        className="flex min-w-0 flex-1 flex-col items-start text-left"
-      >
-        <span className="w-full truncate text-base font-semibold leading-[1.35] text-[#211E19] md:text-[13px]">
-          {task.title}
-        </span>
-        {showCategory && task.category ? (
-          <span className="mt-1 rounded-full bg-white/70 px-2 py-0.5 text-[13px] font-medium text-[#6E6A5E] md:text-[10px]">
-            {task.category}
-          </span>
-        ) : null}
-      </button>
-
-      {!isDragOverlay && (
-        <div className="flex shrink-0 items-center gap-0.5">
-          <button
-            type="button"
-            onClick={handleEdit}
-            aria-label={`Edit ${task.title}`}
-            onTouchStart={stopTouchPropagation}
-            onTouchEnd={stopTouchPropagation}
-            onTouchMove={stopTouchPropagation}
-            className={`${actionIconBase} ${actionIconVisibility} text-[#6E6A5E] hover:opacity-100`}
           >
-            <Pencil size={16} strokeWidth={2} />
+            {planSelected ? (
+              <span className="h-2 w-2 rounded-full bg-white" aria-hidden />
+            ) : null}
           </button>
+        ) : null}
+
+        <div className="flex w-11 shrink-0 items-center justify-center self-start">
           <button
             type="button"
-            onClick={handleDelete}
-            aria-label={`Delete ${task.title}`}
+            onClick={handleComplete}
+            disabled={!canComplete}
+            aria-label={`Mark ${task.title} as done`}
+            onMouseEnter={() => setCheckHovered(true)}
+            onMouseLeave={() => setCheckHovered(false)}
             onTouchStart={stopTouchPropagation}
             onTouchEnd={stopTouchPropagation}
             onTouchMove={stopTouchPropagation}
-            className={`${actionIconBase} ${actionIconVisibility} text-[#C0463F] hover:opacity-100`}
+            className={[
+              'group/time relative flex flex-col items-center justify-center',
+              colors.text,
+              canComplete ? 'cursor-pointer' : '',
+              isTouchLike && canComplete ? 'rounded-full border border-current/25 px-0.5 py-1' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
           >
-            <Trash2 size={16} strokeWidth={2} />
+            <div
+              className={`flex flex-col items-center transition-opacity duration-100 ease ${
+                !isTouchLike && canComplete ? 'group-hover/card:opacity-0' : ''
+              }`}
+            >
+              <span className="text-[22px] font-medium tabular-nums leading-none md:text-[20px]">
+                {task.estimate_minutes}
+              </span>
+              <span className="mt-0.5 text-[11px] font-normal uppercase tracking-[0.06em] opacity-70">
+                min
+              </span>
+            </div>
+
+            {!isTouchLike && canComplete ? (
+              <CircleCheck
+                size={22}
+                strokeWidth={2}
+                aria-hidden
+                className={`absolute transition-opacity duration-100 ease ${colors.text} ${
+                  checkHovered ? 'opacity-100' : 'opacity-0 group-hover/card:opacity-60'
+                }`}
+              />
+            ) : null}
           </button>
         </div>
-      )}
 
-      {!planningMode ? (
+        <div className={`w-px shrink-0 self-stretch ${colors.line}`} aria-hidden />
+
         <button
           type="button"
-          onClick={() => onStart(task.id)}
+          onClick={handleSelect}
           disabled={isDragOverlay}
-          aria-label={`${actionLabel === 'Plan' ? 'Plan' : 'Start focus on'} ${task.title}`}
-          className={`shrink-0 rounded-full border px-[10px] py-1 text-[14px] font-semibold md:text-[11px] ${colors.text} ${colors.bg} ${colors.border}`}
-          onTouchStart={stopTouchPropagation}
-          onTouchEnd={stopTouchPropagation}
-          onTouchMove={stopTouchPropagation}
+          className="min-w-0 flex-1 text-left"
         >
-          {actionLabel}
+          <span className="block w-full whitespace-normal text-base font-normal leading-[1.35] text-[#211E19] md:text-[13px]">
+            {task.title}
+          </span>
         </button>
-      ) : null}
+      </div>
+
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          {showCategory && task.category ? (
+            <span className="inline-block rounded-full border border-border bg-white px-2 py-0.5 text-[13px] font-normal text-[#6E6A5E] md:text-[10px]">
+              {task.category}
+            </span>
+          ) : null}
+        </div>
+
+        {!isDragOverlay && (
+          <div className="flex shrink-0 items-center gap-0.5">
+            <button
+              type="button"
+              onClick={handleEdit}
+              aria-label={`Edit ${task.title}`}
+              onTouchStart={stopTouchPropagation}
+              onTouchEnd={stopTouchPropagation}
+              onTouchMove={stopTouchPropagation}
+              className={`${actionIconBase} ${actionIconVisibility} text-[#6E6A5E] hover:opacity-100`}
+            >
+              <Pencil size={16} strokeWidth={2} />
+            </button>
+            <button
+              type="button"
+              onClick={handleDelete}
+              aria-label={`Delete ${task.title}`}
+              onTouchStart={stopTouchPropagation}
+              onTouchEnd={stopTouchPropagation}
+              onTouchMove={stopTouchPropagation}
+              className={`${actionIconBase} ${actionIconVisibility} text-[#C0463F] hover:opacity-100`}
+            >
+              <Trash2 size={16} strokeWidth={2} />
+            </button>
+
+            {!planningMode ? (
+              <button
+                type="button"
+                onClick={() => onStart(task.id)}
+                disabled={isDragOverlay}
+                aria-label={`${actionLabel === 'Plan' ? 'Plan' : 'Start focus on'} ${task.title}`}
+                className={`ml-0.5 shrink-0 rounded-full border px-[10px] py-1 text-[14px] font-normal md:text-[11px] ${colors.text} ${colors.bg} ${colors.border}`}
+                onTouchStart={stopTouchPropagation}
+                onTouchEnd={stopTouchPropagation}
+                onTouchMove={stopTouchPropagation}
+              >
+                {actionLabel}
+              </button>
+            ) : null}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
