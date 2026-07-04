@@ -14,8 +14,8 @@ import { useChores } from './hooks/useChores';
 import { useTasks } from './hooks/useTasks';
 import { isSupabaseConfigured } from './lib/supabase';
 import { getUniqueCategories, sumEstimateMinutes, getBacklogCompletedTasks } from './types';
-import { getUniqueRooms } from './lib/choreSchedule';
-import type { View } from './types';
+import { getUniqueRooms, getScheduleFilterForChore } from './lib/choreSchedule';
+import type { Chore, ChoreScheduleFilter, View } from './types';
 
 export default function App() {
   const { user, loading: authLoading, signInWithMagicLink, signOut } = useAuth();
@@ -38,9 +38,11 @@ export default function App() {
   const {
     chores,
     loading: choresLoading,
+    error: choresError,
     addChore,
     completeChore,
     updateChore,
+    deleteChore,
   } = useChores(user?.id);
   const {
     endTime,
@@ -50,6 +52,13 @@ export default function App() {
     clearEndTime,
   } = useCapacityWindow();
   const [currentView, setCurrentView] = useState<View>('today');
+  const [pendingChoreScheduleFilter, setPendingChoreScheduleFilter] =
+    useState<ChoreScheduleFilter | null>(null);
+
+  const handleChoreAdded = (chore: Chore) => {
+    setPendingChoreScheduleFilter(getScheduleFilterForChore(chore));
+    setCurrentView('chores');
+  };
 
   const plannedMinutes = sumEstimateMinutes(tasks);
   const backlogCompletedTasks = getBacklogCompletedTasks(completedTasks);
@@ -93,6 +102,7 @@ export default function App() {
           addBacklogTask={addTask}
           addChore={addChore}
           existingRooms={getUniqueRooms(chores)}
+          onChoreAdded={handleChoreAdded}
           onNavigateToBacklog={() => setCurrentView('backlog')}
         />
       );
@@ -107,6 +117,7 @@ export default function App() {
           onAddTask={addTask}
           onAddToToday={addTodayTask}
           onAddChore={addChore}
+          onChoreAdded={handleChoreAdded}
           existingRooms={getUniqueRooms(chores)}
           onUpdateTask={updateTask}
           onDeleteTask={deleteTask}
@@ -128,10 +139,14 @@ export default function App() {
       return (
         <ChoresView
           chores={chores}
+          choresError={choresError}
           loading={choresLoading}
+          pendingScheduleFilter={pendingChoreScheduleFilter}
+          onPendingScheduleFilterApplied={() => setPendingChoreScheduleFilter(null)}
           onAddChore={addChore}
           onCompleteChore={completeChore}
           onUpdateChore={updateChore}
+          onDeleteChore={deleteChore}
           addTodayTask={addTodayTask}
           addBacklogTask={addTask}
           existingCategories={existingCategories}
@@ -165,7 +180,7 @@ export default function App() {
               onClearEndTime={clearEndTime}
               tasksLoading
             />
-            <main className="flex min-h-0 flex-1 flex-col overflow-auto pb-20 md:pb-0">
+            <main className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain pb-20 md:pb-0">
               <TodayViewSkeleton />
             </main>
           </div>
@@ -176,13 +191,15 @@ export default function App() {
     return <SignInScreen onSignIn={signInWithMagicLink} />;
   }
 
+  const displayError = error ?? choresError;
+
   const layout = (
     <>
       <Sidebar {...sidebarProps} />
-      <main className="flex min-h-0 flex-1 flex-col overflow-auto pb-20 md:pb-0">
-        {error && (
+      <main className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain pb-20 md:pb-0">
+        {displayError && (
           <div className="mx-4 mt-4 rounded-[12px] border border-urgent-border bg-urgent-bg px-4 py-2 text-base text-urgent sm:mx-6 md:text-sm">
-            {error}
+            {displayError}
           </div>
         )}
         {renderMain()}

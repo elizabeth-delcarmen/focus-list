@@ -1,9 +1,9 @@
 export type Priority = 'urgent' | 'high' | 'medium' | 'low';
 export type Status = 'todo' | 'in_progress' | 'done';
 export type View = 'today' | 'chores' | 'backlog';
-export type RecurrenceType = 'weekly' | 'monthly' | 'quarterly' | 'biannual' | 'yearly';
-export type ChoreFrequencyFilter = RecurrenceType;
-export type ChoreGroupMode = 'day' | 'room';
+export type IntervalUnit = 'days' | 'weeks' | 'months';
+export type ChoreScheduleFilter = 'today' | 'weekly' | 'all' | 'someday';
+export type ChoreViewMode = 'schedule' | 'room';
 export type DurationFilter = 'all' | 'quick' | 'medium' | 'deep';
 export type GroupMode = 'list' | 'category' | 'duration';
 
@@ -35,10 +35,13 @@ export interface Chore {
   title: string;
   room?: string | null;
   time_estimate_minutes: number;
-  recurrence_type: RecurrenceType;
+  /** Only set to 'someday' for no-schedule chores; null for repeating chores */
+  recurrence_type?: 'someday' | null;
+  interval_value?: number | null;
+  interval_unit?: IntervalUnit | null;
   day_of_week?: number | null;
   last_completed_at?: string | null;
-  next_due_at: string;
+  next_due_at: string | null;
   actual_time_minutes?: number | null;
   created_at: string;
 }
@@ -47,31 +50,35 @@ export interface NewChoreInput {
   title: string;
   room?: string;
   time_estimate_minutes: number;
-  recurrence_type: RecurrenceType;
+  repeats: boolean;
+  interval_value?: number;
+  interval_unit?: IntervalUnit;
   day_of_week?: number | null;
+  /** Initial due date (YYYY-MM-DD), required on add when repeats is true */
+  next_due_on?: string;
 }
 
-export const CHORE_TIME_CHIPS = [15, 30, 45, 60] as const;
+/** Values submitted from ChoreForm when editing an existing chore */
+export interface EditChoreInput extends NewChoreInput {
+  next_due_on_changed?: boolean;
+}
 
-export const RECURRENCE_OPTIONS: { id: RecurrenceType; label: string }[] = [
-  { id: 'weekly', label: 'Weekly' },
-  { id: 'monthly', label: 'Monthly' },
-  { id: 'quarterly', label: 'Quarterly' },
-  { id: 'biannual', label: 'Biannual' },
-  { id: 'yearly', label: 'Yearly' },
+export const INTERVAL_UNITS: { id: IntervalUnit; label: string }[] = [
+  { id: 'days', label: 'Days' },
+  { id: 'weeks', label: 'Weeks' },
+  { id: 'months', label: 'Months' },
 ];
 
-export const CHORE_FREQUENCY_FILTERS: { id: ChoreFrequencyFilter; label: string }[] = [
-  { id: 'weekly', label: 'This week' },
-  { id: 'monthly', label: 'Monthly' },
-  { id: 'quarterly', label: 'Quarterly' },
-  { id: 'biannual', label: 'Biannual' },
-  { id: 'yearly', label: 'Yearly' },
-];
-
-export const CHORE_GROUP_MODES: { id: ChoreGroupMode; label: string }[] = [
-  { id: 'day', label: 'By day' },
+export const CHORE_VIEW_MODES: { id: ChoreViewMode; label: string }[] = [
+  { id: 'schedule', label: 'By schedule' },
   { id: 'room', label: 'By room' },
+];
+
+export const CHORE_SCHEDULE_FILTERS: { id: ChoreScheduleFilter; label: string }[] = [
+  { id: 'today', label: 'Today' },
+  { id: 'weekly', label: 'This week' },
+  { id: 'all', label: 'All' },
+  { id: 'someday', label: 'Someday' },
 ];
 
 export interface TaskFormValues {

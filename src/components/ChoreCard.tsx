@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react';
-import { CircleCheck } from 'lucide-react';
-import { getChoreDueStatus, getRecurrenceLabel, isChoreOverdue } from '../lib/choreSchedule';
+import { CircleCheck, Pencil, Trash2 } from 'lucide-react';
+import {
+  getChoreDateSubtitle,
+  getChoreDueStatus,
+  getChoreIntervalLabel,
+  isChoreOverdue,
+  isChoreSomeday,
+} from '../lib/choreSchedule';
 import { PRIORITY_COLORS } from '../types';
 import type { Chore } from '../types';
 
@@ -9,6 +15,8 @@ export interface ChoreCardProps {
   isCompleting?: boolean;
   onComplete?: (choreId: string) => void;
   onStart: (choreId: string) => void;
+  onEdit: (choreId: string) => void;
+  onDelete: (choreId: string) => void;
 }
 
 export function ChoreCard({
@@ -16,11 +24,13 @@ export function ChoreCard({
   isCompleting = false,
   onComplete,
   onStart,
+  onEdit,
+  onDelete,
 }: ChoreCardProps) {
   const [isTouchLike, setIsTouchLike] = useState(false);
   const [checkHovered, setCheckHovered] = useState(false);
 
-  const overdue = isChoreOverdue(chore);
+  const overdue = !isChoreSomeday(chore) && isChoreOverdue(chore);
   const colors = overdue ? PRIORITY_COLORS.urgent : PRIORITY_COLORS.low;
   const status = getChoreDueStatus(chore);
   const canComplete = Boolean(onComplete);
@@ -51,6 +61,25 @@ export function ChoreCard({
   const stopTouchPropagation = (event: React.TouchEvent) => {
     event.stopPropagation();
   };
+
+  const handleEdit = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    onEdit(chore.id);
+  };
+
+  const handleDelete = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (window.confirm(`Delete "${chore.title}"?`)) {
+      onDelete(chore.id);
+    }
+  };
+
+  const actionIconBase =
+    'flex h-7 w-7 items-center justify-center rounded-full transition-opacity duration-150 ease hover:bg-white/60 focus-visible:opacity-100';
+
+  const actionIconVisibility = isTouchLike
+    ? 'opacity-70 pointer-events-auto'
+    : 'pointer-events-none opacity-0 group-hover/card:pointer-events-auto group-hover/card:opacity-70';
 
   const statusPillClass =
     status.kind === 'overdue'
@@ -118,18 +147,52 @@ export function ChoreCard({
           <span className="block w-full whitespace-normal text-base font-normal leading-[1.35] text-[#211E19] md:text-[13px]">
             {chore.title}
           </span>
+          <span
+            className={`mt-0.5 block text-[13px] font-normal leading-snug md:text-[11px] ${
+              overdue ? 'text-[#C0463F]' : 'text-[#938C7C]'
+            }`}
+          >
+            {getChoreDateSubtitle(chore)}
+          </span>
         </button>
       </div>
 
       <div className="flex items-center justify-between gap-2">
-        <span className="inline-block rounded-full border border-border bg-white px-2 py-0.5 text-[13px] font-normal text-[#6E6A5E] md:text-[10px]">
-          {getRecurrenceLabel(chore.recurrence_type)}
-        </span>
-        <span
-          className={`shrink-0 rounded-full px-[10px] py-1 text-[14px] font-normal md:text-[11px] ${statusPillClass}`}
-        >
-          {status.label}
-        </span>
+        <div className="min-w-0">
+          <span className="inline-block rounded-full border border-border bg-white px-2 py-0.5 text-[13px] font-normal text-[#6E6A5E] md:text-[10px]">
+            {getChoreIntervalLabel(chore)}
+          </span>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-0.5">
+          <button
+            type="button"
+            onClick={handleEdit}
+            aria-label={`Edit ${chore.title}`}
+            onTouchStart={stopTouchPropagation}
+            onTouchEnd={stopTouchPropagation}
+            onTouchMove={stopTouchPropagation}
+            className={`${actionIconBase} ${actionIconVisibility} text-[#6E6A5E] hover:opacity-100`}
+          >
+            <Pencil size={16} strokeWidth={2} />
+          </button>
+          <button
+            type="button"
+            onClick={handleDelete}
+            aria-label={`Delete ${chore.title}`}
+            onTouchStart={stopTouchPropagation}
+            onTouchEnd={stopTouchPropagation}
+            onTouchMove={stopTouchPropagation}
+            className={`${actionIconBase} ${actionIconVisibility} text-[#C0463F] hover:opacity-100`}
+          >
+            <Trash2 size={16} strokeWidth={2} />
+          </button>
+          <span
+            className={`ml-0.5 shrink-0 rounded-full px-[10px] py-1 text-[14px] font-normal md:text-[11px] ${statusPillClass}`}
+          >
+            {status.label}
+          </span>
+        </div>
       </div>
     </div>
   );
