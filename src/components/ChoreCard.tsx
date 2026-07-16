@@ -69,7 +69,7 @@ export function ChoreCard({
             e.stopPropagation();
             onEdit(chore.id);
           }}
-          className="flex size-5 shrink-0 items-center justify-center text-text-muted transition-colors hover:text-text-primary"
+          className="flex size-11 shrink-0 items-center justify-center text-text-muted transition-colors hover:text-text-primary"
         >
           <MoreVertical size={20} strokeWidth={2} />
         </button>
@@ -98,16 +98,16 @@ export function ChoreCard({
         <span className="rounded-[8px] bg-[#f3f4fb] px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wide text-text-muted">
           {pillLabel}
         </span>
-        <div className="flex shrink-0 items-center gap-4">
+        <div className="-mr-2 flex shrink-0 items-center">
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               onStart(chore.id);
             }}
-            className="flex items-center gap-1 text-[13px] font-medium text-accent transition-opacity hover:opacity-80"
+            className="flex min-h-11 items-center gap-1 px-2 text-[15px] font-medium text-accent transition-opacity hover:opacity-80"
           >
-            <Play size={12} fill="currentColor" strokeWidth={0} aria-hidden />
+            <Play size={14} fill="currentColor" strokeWidth={0} aria-hidden />
             Start
           </button>
           <button
@@ -116,14 +116,14 @@ export function ChoreCard({
               e.stopPropagation();
               onEdit(chore.id);
             }}
-            className="text-[13px] font-medium text-accent transition-opacity hover:opacity-80"
+            className="flex min-h-11 items-center px-2 text-[15px] font-medium text-accent transition-opacity hover:opacity-80"
           >
             Edit
           </button>
           <button
             type="button"
             onClick={handleDelete}
-            className="text-[13px] font-medium text-text-muted transition-opacity hover:opacity-80"
+            className="flex min-h-11 items-center px-2 text-[15px] font-medium text-text-muted transition-opacity hover:opacity-80"
           >
             Delete
           </button>

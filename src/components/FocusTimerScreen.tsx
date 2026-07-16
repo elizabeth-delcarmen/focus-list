@@ -58,7 +58,7 @@ export function FocusTimerScreen({
           type="button"
           onClick={onMinimize}
           aria-label="Back"
-          className="flex size-10 shrink-0 items-center justify-center rounded-[20px] border border-[#e5e7eb] bg-surface text-text-primary shadow-[0_4px_6px_rgba(0,0,0,0.02)]"
+          className="flex size-11 shrink-0 items-center justify-center rounded-[20px] border border-[#e5e7eb] bg-surface text-text-primary shadow-[0_4px_6px_rgba(0,0,0,0.02)]"
         >
           <ArrowLeft size={20} strokeWidth={2} />
         </button>
@@ -70,7 +70,7 @@ export function FocusTimerScreen({
             type="button"
             onClick={() => setSwitcherOpen(true)}
             aria-label="Switch task"
-            className="flex size-10 shrink-0 items-center justify-center rounded-[20px] border border-[#e5e7eb] bg-surface text-text-muted"
+            className="flex size-11 shrink-0 items-center justify-center rounded-[20px] border border-[#e5e7eb] bg-surface text-text-muted"
           >
             <List size={18} strokeWidth={2} />
           </button>

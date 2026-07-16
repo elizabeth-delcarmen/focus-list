@@ -331,12 +331,31 @@ export function ChoreForm({
   return (
     <form
       onSubmit={handleSubmit}
+      autoComplete="off"
       className={
         variant === 'sheet'
           ? 'max-h-[min(85dvh,720px)] overflow-y-auto px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-2'
           : 'rounded-[20px] border border-[#e5e7eb] bg-surface p-5'
       }
     >
+      {/* Absorb browser autofill so real fields stay clean */}
+      <input
+        type="text"
+        name="prevent-autofill-username"
+        autoComplete="username"
+        tabIndex={-1}
+        aria-hidden
+        className="pointer-events-none absolute h-0 w-0 opacity-0"
+      />
+      <input
+        type="password"
+        name="prevent-autofill-password"
+        autoComplete="new-password"
+        tabIndex={-1}
+        aria-hidden
+        className="pointer-events-none absolute h-0 w-0 opacity-0"
+      />
+
       {variant === 'sheet' ? (
         <div className="mb-6 flex items-center justify-between">
           <h2 className="font-display text-[24px] text-text-primary">
@@ -346,7 +365,7 @@ export function ChoreForm({
             type="button"
             onClick={onCancel}
             aria-label="Close"
-            className="flex size-8 items-center justify-center rounded-[16px] bg-[#f3f4fb] text-text-muted"
+            className="flex size-11 items-center justify-center rounded-[16px] bg-[#f3f4fb] text-text-muted"
           >
             <X size={16} strokeWidth={2} />
           </button>
@@ -357,13 +376,21 @@ export function ChoreForm({
         <div className="flex flex-col gap-2">
           <FieldLabel>Task Name</FieldLabel>
           <input
-            type="text"
+            type="search"
+            name="chore-title"
+            id="chore-title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Organise black cabinet"
             autoComplete="off"
             autoCorrect="off"
-            autoFocus={mode === 'add'}
+            autoCapitalize="sentences"
+            spellCheck={false}
+            enterKeyHint="done"
+            inputMode="text"
+            data-1p-ignore
+            data-lpignore="true"
+            data-form-type="other"
             className={inputClass}
           />
         </div>
@@ -389,7 +416,7 @@ export function ChoreForm({
                       setRoom(name);
                       setShowRoomPicker(false);
                     }}
-                    className={`rounded-[10px] px-3 py-2 text-left text-[14px] ${
+                    className={`flex min-h-11 items-center rounded-[10px] px-3 text-left text-[14px] ${
                       room === name
                         ? 'bg-accent text-white'
                         : 'text-text-primary hover:bg-[#f3f4fb]'
@@ -401,11 +428,20 @@ export function ChoreForm({
               </div>
               <div className="mt-2 flex gap-2 border-t border-[#e5e7eb] pt-2">
                 <input
-                  type="text"
+                  type="search"
+                  name="chore-new-room"
                   value={newRoomValue}
                   onChange={(e) => setNewRoomValue(e.target.value)}
                   placeholder="New room"
-                  className="min-w-0 flex-1 rounded-[10px] border border-[#e5e7eb] bg-[#f3f4fb] px-3 py-2 text-[14px] outline-none"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="words"
+                  spellCheck={false}
+                  enterKeyHint="done"
+                  data-1p-ignore
+                  data-lpignore="true"
+                  data-form-type="other"
+                  className="min-h-11 min-w-0 flex-1 rounded-[10px] border border-[#e5e7eb] bg-[#f3f4fb] px-3 text-[14px] outline-none"
                 />
                 <button
                   type="button"
@@ -418,7 +454,7 @@ export function ChoreForm({
                     setNewRoomValue('');
                     setShowRoomPicker(false);
                   }}
-                  className="rounded-[10px] bg-accent px-3 py-2 text-[13px] font-semibold text-white disabled:opacity-40"
+                  className="min-h-11 rounded-[10px] bg-accent px-4 text-[13px] font-semibold text-white disabled:opacity-40"
                 >
                   Add
                 </button>
@@ -433,7 +469,13 @@ export function ChoreForm({
             <Clock size={14} className="text-text-muted" aria-hidden />
             <input
               type="number"
+              name="chore-estimate-minutes"
               min={1}
+              inputMode="numeric"
+              autoComplete="off"
+              data-1p-ignore
+              data-lpignore="true"
+              data-form-type="other"
               value={timeEstimate}
               onChange={(e) => {
                 const parsed = parseInt(e.target.value, 10);
@@ -445,7 +487,7 @@ export function ChoreForm({
           </div>
         </div>
 
-        <div className="flex items-center justify-between py-4">
+        <div className="flex items-center justify-between py-1">
           <span className="text-[14px] font-medium text-[#4a5463]">Set Schedule</span>
           <button
             type="button"
@@ -453,15 +495,19 @@ export function ChoreForm({
             aria-checked={scheduleEnabled}
             aria-label="Set Schedule"
             onClick={() => setScheduleEnabled((v) => !v)}
-            className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-              scheduleEnabled ? 'bg-accent' : 'bg-[#d1d5db]'
-            }`}
+            className="flex min-h-11 min-w-11 items-center justify-center"
           >
             <span
-              className={`absolute top-0.5 left-0.5 size-5 rounded-full bg-white shadow-sm transition-transform ${
-                scheduleEnabled ? 'translate-x-5' : 'translate-x-0'
+              className={`relative h-7 w-12 rounded-full transition-colors ${
+                scheduleEnabled ? 'bg-accent' : 'bg-[#d1d5db]'
               }`}
-            />
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 size-6 rounded-full bg-white shadow-sm transition-transform ${
+                  scheduleEnabled ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </span>
           </button>
         </div>
 
@@ -505,7 +551,7 @@ export function ChoreForm({
                       key={id}
                       type="button"
                       onClick={() => setRecurrence(id)}
-                      className={`flex-1 rounded-[10px] py-2.5 text-[11px] font-semibold ${
+                      className={`flex min-h-11 flex-1 items-center justify-center rounded-[10px] text-[11px] font-semibold ${
                         selected
                           ? 'bg-[#4e5ddc] text-white'
                           : 'border border-[#e5e7eb] bg-[#f3f4fb] text-text-muted'
@@ -528,7 +574,7 @@ export function ChoreForm({
                     type="button"
                     onClick={() => bumpEvery(-1)}
                     aria-label="Decrease"
-                    className="flex size-8 items-center justify-center rounded-[16px] border border-[#e5e7eb] bg-[#f3f4fb]"
+                    className="flex size-11 items-center justify-center rounded-[16px] border border-[#e5e7eb] bg-[#f3f4fb]"
                   >
                     <Minus size={14} />
                   </button>
@@ -539,7 +585,7 @@ export function ChoreForm({
                     type="button"
                     onClick={() => bumpEvery(1)}
                     aria-label="Increase"
-                    className="flex size-8 items-center justify-center rounded-[16px] border border-[#e5e7eb] bg-[#f3f4fb]"
+                    className="flex size-11 items-center justify-center rounded-[16px] border border-[#e5e7eb] bg-[#f3f4fb]"
                   >
                     <Plus size={14} />
                   </button>
@@ -556,7 +602,7 @@ export function ChoreForm({
                       key={day.id}
                       type="button"
                       onClick={() => setWeekday(day.id)}
-                      className={`flex size-10 items-center justify-center rounded-[20px] text-[12px] font-semibold ${
+                      className={`flex size-11 items-center justify-center rounded-[20px] text-[12px] font-semibold ${
                         selected
                           ? 'bg-[#4e5ddc] text-white'
                           : 'border border-[#e5e7eb] bg-surface text-text-muted'
@@ -578,7 +624,7 @@ export function ChoreForm({
                       key={day}
                       type="button"
                       onClick={() => setMonthDay(day)}
-                      className={`flex h-9 items-center justify-center rounded-[8px] text-[13px] ${
+                      className={`flex min-h-11 items-center justify-center rounded-[8px] text-[13px] ${
                         selected
                           ? 'bg-[#4e5ddc] font-bold text-white'
                           : 'bg-[#f3f4fb] text-text-primary'
@@ -600,7 +646,7 @@ export function ChoreForm({
                       key={name}
                       type="button"
                       onClick={() => setYearMonth(index)}
-                      className="flex w-full items-center justify-between border-b border-[#e5e7eb] px-3 py-3 text-left last:border-b-0"
+                      className="flex min-h-11 w-full items-center justify-between border-b border-[#e5e7eb] px-3 text-left last:border-b-0"
                     >
                       <span className="text-[14px] text-text-primary">{name}</span>
                       <span
@@ -635,7 +681,7 @@ export function ChoreForm({
         <button
           type="button"
           onClick={() => void onDelete()}
-          className="mt-3 w-full text-center text-[14px] font-medium text-urgent"
+          className="mt-3 flex min-h-11 w-full items-center justify-center text-[14px] font-medium text-urgent"
         >
           Delete
         </button>

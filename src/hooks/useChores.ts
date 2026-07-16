@@ -22,6 +22,7 @@ interface UseChoresResult {
     actualTimeMinutes?: number,
     recurrenceChoice?: ChoreRecurrenceChoice,
   ) => Promise<{ chore: Chore; nextDueAt: string | null } | null>;
+  undoCompleteChore: (snapshot: Chore) => Promise<boolean>;
   updateChore: (id: string, changes: Partial<Chore>) => Promise<boolean>;
   deleteChore: (id: string) => Promise<void>;
   refresh: () => Promise<void>;
@@ -215,6 +216,33 @@ export function useChores(userId: string | undefined): UseChoresResult {
     [chores],
   );
 
+  const undoCompleteChore = useCallback(async (snapshot: Chore): Promise<boolean> => {
+    const client = requireSupabase();
+    const { data, error: updateError } = await client
+      .from('chores')
+      .update({
+        next_due_at: snapshot.next_due_at,
+        last_completed_at: snapshot.last_completed_at ?? null,
+        actual_time_minutes: snapshot.actual_time_minutes ?? null,
+        recurrence_type: snapshot.recurrence_type ?? null,
+        interval_value: snapshot.interval_value ?? null,
+        interval_unit: snapshot.interval_unit ?? null,
+        day_of_week: snapshot.day_of_week ?? null,
+      })
+      .eq('id', snapshot.id)
+      .select()
+      .single();
+
+    if (updateError) {
+      setError(updateError.message);
+      return false;
+    }
+
+    setError(null);
+    setChores((prev) => prev.map((c) => (c.id === snapshot.id ? (data as Chore) : c)));
+    return true;
+  }, []);
+
   const updateChore = useCallback(async (id: string, changes: Partial<Chore>): Promise<boolean> => {
     let payload: Partial<Chore> = changes;
     if (changes.title != null) {
@@ -260,6 +288,7 @@ export function useChores(userId: string | undefined): UseChoresResult {
     error,
     addChore,
     completeChore,
+    undoCompleteChore,
     updateChore,
     deleteChore,
     refresh: fetchChores,

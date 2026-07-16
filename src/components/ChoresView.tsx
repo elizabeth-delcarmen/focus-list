@@ -60,6 +60,7 @@ interface ChoresViewProps {
     actualTimeMinutes?: number,
     recurrenceChoice?: ChoreRecurrenceChoice,
   ) => Promise<{ chore: Chore; nextDueAt: string | null } | null>;
+  onUndoCompleteChore: (snapshot: Chore) => Promise<boolean>;
   onUpdateChore: (id: string, changes: Partial<Chore>) => Promise<boolean>;
   onDeleteChore: (id: string) => Promise<void>;
   addTodayTask: (task: NewTaskInput) => Promise<Task | null>;
@@ -91,6 +92,7 @@ export function ChoresView({
   loading = false,
   onAddChore,
   onCompleteChore,
+  onUndoCompleteChore,
   onUpdateChore,
   onDeleteChore,
   addTodayTask,
@@ -107,6 +109,7 @@ export function ChoresView({
   const [focusTimerExpanded, setFocusTimerExpanded] = useState(false);
   const [completionSubline, setCompletionSubline] = useState<string | undefined>();
   const [forceCompleted, setForceCompleted] = useState(false);
+  const [choreUndoSnapshots, setChoreUndoSnapshots] = useState<Record<string, Chore>>({});
   const [repeatPrompt, setRepeatPrompt] = useState<{
     choreId: string;
     actualMinutes?: number;
@@ -242,10 +245,14 @@ export function ChoresView({
       completingRef.current = true;
       setCompletingChoreId(choreId);
 
+      const chore = chores.find((c) => c.id === choreId);
+      if (chore) {
+        setChoreUndoSnapshots((prev) => ({ ...prev, [choreId]: chore }));
+      }
+
       await new Promise((resolve) => setTimeout(resolve, COMPLETE_ANIM_MS));
 
       const wasTiming = timer.activeTaskId === choreId;
-      const chore = chores.find((c) => c.id === choreId);
 
       await onCompleteChore(
         choreId,
@@ -265,21 +272,39 @@ export function ChoresView({
     [timer, chores, onCompleteChore],
   );
 
+  const handleUndoCompleteChore = useCallback(
+    async (choreId: string) => {
+      const snapshot = choreUndoSnapshots[choreId];
+      if (!snapshot) return false;
+      const ok = await onUndoCompleteChore(snapshot);
+      if (ok) {
+        setChoreUndoSnapshots((prev) => {
+          const next = { ...prev };
+          delete next[choreId];
+          return next;
+        });
+      }
+      return ok;
+    },
+    [choreUndoSnapshots, onUndoCompleteChore],
+  );
+
   const handleCompleteChore = useCallback(
     async (
       choreId: string,
       actualMinutes?: number,
       recurrenceChoice?: ChoreRecurrenceChoice,
-    ) => {
+    ): Promise<'done' | 'prompted' | 'noop'> => {
       const chore = chores.find((c) => c.id === choreId);
-      if (!chore) return;
+      if (!chore) return 'noop';
 
       if (needsChoreRepeatPrompt(chore) && !recurrenceChoice) {
         setRepeatPrompt({ choreId, actualMinutes });
-        return;
+        return 'prompted';
       }
 
       await finishCompleteChore(choreId, actualMinutes, recurrenceChoice);
+      return 'done';
     },
     [chores, finishCompleteChore],
   );
@@ -473,6 +498,7 @@ export function ChoresView({
       {detailChore ? (
         <ChoreDetailScreen
           chore={detailChore}
+          canUncomplete={Boolean(choreUndoSnapshots[detailChore.id])}
           onBack={() => setDetailChoreId(null)}
           onStart={(id) => {
             setDetailChoreId(null);
@@ -482,6 +508,8 @@ export function ChoresView({
             setDetailChoreId(null);
             setEditingChoreId(id);
           }}
+          onComplete={(id) => handleCompleteChore(id)}
+          onUncomplete={(id) => handleUndoCompleteChore(id)}
         />
       ) : mode === 'rooms' && !selectedRoom ? (
         <RoomsOverview
@@ -497,7 +525,7 @@ export function ChoresView({
                 type="button"
                 onClick={() => setSelectedRoom(null)}
                 aria-label="Back to rooms"
-                className="flex size-6 items-center justify-center text-text-primary"
+                className="-ml-2 flex size-11 items-center justify-center text-text-primary"
               >
                 <ArrowLeft size={24} strokeWidth={2} />
               </button>
@@ -531,7 +559,7 @@ export function ChoresView({
                   key={id}
                   type="button"
                   onClick={() => handleScheduleFilterChange(id)}
-                  className={`rounded-full border px-3 py-1 text-[15px] font-medium transition-colors md:text-xs ${
+                  className={`flex min-h-11 items-center rounded-full border px-3 text-[15px] font-medium transition-colors md:min-h-0 md:py-1 md:text-xs ${
                     scheduleFilter === id ? FILTER_PILL_ACTIVE : FILTER_PILL_INACTIVE
                   }`}
                 >

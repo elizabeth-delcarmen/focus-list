@@ -44,6 +44,7 @@ export default function App() {
     error: choresError,
     addChore,
     completeChore,
+    undoCompleteChore,
     updateChore,
     deleteChore,
   } = useChores(user?.id);
@@ -99,6 +100,7 @@ export default function App() {
           onPendingScheduleFilterApplied={() => setPendingChoreScheduleFilter(null)}
           onAddChore={addChore}
           onCompleteChore={completeChore}
+          onUndoCompleteChore={undoCompleteChore}
           onUpdateChore={updateChore}
           onDeleteChore={deleteChore}
           addTodayTask={addTodayTask}
