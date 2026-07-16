@@ -1,6 +1,6 @@
 export type Priority = 'urgent' | 'high' | 'medium' | 'low';
 export type Status = 'todo' | 'in_progress' | 'done';
-export type View = 'today' | 'chores' | 'backlog';
+export type View = 'rooms' | 'today' | 'schedule' | 'settings' | 'backlog';
 export type IntervalUnit = 'days' | 'weeks' | 'months';
 export type ChoreScheduleFilter = 'overdue' | 'today' | 'weekly' | 'all' | 'someday';
 export type ChoreViewMode = 'schedule' | 'room';

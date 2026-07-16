@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarDays, Home } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { AddChoreBottomSheet } from './AddChoreBottomSheet';
-import { AddTaskBottomSheet, type TaskDestination } from './AddTaskBottomSheet';
 import { AddTaskFab } from './AddTaskFab';
-import { AddTypeChooserSheet } from './AddTypeChooserSheet';
 import { ChoreCard } from './ChoreCard';
-import { ChoreForm } from './ChoreForm';
+import { ChoreDetailScreen } from './ChoreDetailScreen';
 import { ChoreRepeatPromptSheet } from './ChoreRepeatPromptSheet';
 import { FocusTimerScreen } from './FocusTimerScreen';
+import { RoomsOverview } from './RoomsOverview';
 import { TaskQueueSkeleton } from './Skeleton';
 import { useChoreRooms } from '../hooks/useChoreRooms';
 import { useTimer } from '../hooks/useTimer';
@@ -17,7 +16,8 @@ import {
   countOverdueChores,
   deriveDayOfWeekForChore,
   formatNextDueInterval,
-  getChoreInterval,
+  getChoreDueStatus,
+  getChoreIntervalLabel,
   getScheduleFilterForChore,
   groupChoresByRoom,
   groupChoresForScheduleView,
@@ -25,7 +25,6 @@ import {
   isChoreSomeday,
   isChoreVisibleInScheduleFilter,
   needsChoreRepeatPrompt,
-  nextDueAtToDateString,
   normalizeChoreTitle,
 } from '../lib/choreSchedule';
 import {
@@ -33,7 +32,6 @@ import {
   type Chore,
   type ChoreRecurrenceChoice,
   type ChoreScheduleFilter,
-  type ChoreViewMode,
   type EditChoreInput,
   type NewChoreInput,
   type NewTaskInput,
@@ -43,11 +41,14 @@ import {
 const COMPLETE_ANIM_MS = 300;
 
 const FILTER_PILL_ACTIVE =
-  'border-[#3D3530] bg-[#3D3530] text-[#FAF8F3]';
+  'border-accent bg-accent text-white';
 const FILTER_PILL_INACTIVE =
-  'border-[#D8D3C8] bg-transparent text-[#3D3530] hover:border-[#3D3530]/40';
+  'border-border bg-transparent text-text-primary hover:border-accent/40';
+
+export type ChoresScreenMode = 'rooms' | 'schedule';
 
 interface ChoresViewProps {
+  mode?: ChoresScreenMode;
   chores: Chore[];
   choresError?: string | null;
   pendingScheduleFilter?: ChoreScheduleFilter | null;
@@ -63,7 +64,7 @@ interface ChoresViewProps {
   onDeleteChore: (id: string) => Promise<void>;
   addTodayTask: (task: NewTaskInput) => Promise<Task | null>;
   addBacklogTask: (task: NewTaskInput) => Promise<Task | null>;
-  existingCategories: string[];
+  hideFab?: boolean;
 }
 
 function choreToTimerTask(chore: Chore): Task {
@@ -82,6 +83,7 @@ function choreToTimerTask(chore: Chore): Task {
 }
 
 export function ChoresView({
+  mode = 'rooms',
   chores,
   choresError = null,
   pendingScheduleFilter = null,
@@ -93,12 +95,11 @@ export function ChoresView({
   onDeleteChore,
   addTodayTask,
   addBacklogTask,
-  existingCategories,
+  hideFab = false,
 }: ChoresViewProps) {
-  const [viewMode, setViewMode] = useState<ChoreViewMode>('schedule');
+  const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
+  const [detailChoreId, setDetailChoreId] = useState<string | null>(null);
   const [scheduleFilter, setScheduleFilter] = useState<ChoreScheduleFilter>('today');
-  const [chooserOpen, setChooserOpen] = useState(false);
-  const [taskSheetOpen, setTaskSheetOpen] = useState(false);
   const [choreSheetOpen, setChoreSheetOpen] = useState(false);
   const [sheetKey, setSheetKey] = useState(0);
   const [completingChoreId, setCompletingChoreId] = useState<string | null>(null);
@@ -112,16 +113,18 @@ export function ChoresView({
   } | null>(null);
   const completingRef = useRef(false);
 
-  const handleViewModeChange = (mode: ChoreViewMode) => {
-    setViewMode(mode);
-  };
+  useEffect(() => {
+    if (mode === 'rooms') {
+      setSelectedRoom(null);
+      setDetailChoreId(null);
+    }
+  }, [mode]);
 
   const handleScheduleFilterChange = (filter: ChoreScheduleFilter) => {
     setScheduleFilter(filter);
   };
 
   const handleChoreAdded = useCallback((chore: Chore) => {
-    setViewMode('schedule');
     setScheduleFilter(getScheduleFilterForChore(chore));
   }, []);
 
@@ -135,6 +138,21 @@ export function ChoresView({
 
   const totalOverdueCount = useMemo(() => countOverdueChores(chores), [chores]);
 
+  const roomSummaries = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const room of existingRooms) {
+      counts.set(room, 0);
+    }
+    for (const chore of chores) {
+      const room = chore.room?.trim();
+      if (!room) continue;
+      counts.set(room, (counts.get(room) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .map(([name, taskCount]) => ({ name, taskCount }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [chores, existingRooms]);
+
   const filterCounts = useMemo(
     () =>
       Object.fromEntries(
@@ -144,15 +162,21 @@ export function ChoresView({
   );
 
   const filteredChores = useMemo(() => {
+    if (mode === 'rooms' && selectedRoom) {
+      return chores.filter((c) => (c.room?.trim() || 'Unassigned') === selectedRoom);
+    }
     return chores.filter((c) => isChoreVisibleInScheduleFilter(c, scheduleFilter));
-  }, [chores, scheduleFilter]);
+  }, [chores, scheduleFilter, mode, selectedRoom]);
 
   const groupedChores = useMemo(() => {
-    if (viewMode === 'room') {
+    if (mode === 'rooms' && selectedRoom) {
+      return [{ label: '', chores: filteredChores }];
+    }
+    if (mode === 'rooms') {
       return groupChoresByRoom(filteredChores);
     }
     return groupChoresForScheduleView(filteredChores, scheduleFilter);
-  }, [filteredChores, viewMode, scheduleFilter]);
+  }, [filteredChores, mode, selectedRoom, scheduleFilter]);
 
   const timerTasks = useMemo(
     () => filteredChores.map(choreToTimerTask),
@@ -202,9 +226,9 @@ export function ChoresView({
     }
   }, [isTimerCompleted, timer.isRunning, timer.pause]);
 
-  const openChooser = () => {
+  const openNewTask = () => {
     setSheetKey((key) => key + 1);
-    setChooserOpen(true);
+    setChoreSheetOpen(true);
   };
 
   const finishCompleteChore = useCallback(
@@ -335,19 +359,20 @@ export function ChoresView({
       updatePayload.day_of_week = null;
     } else if (nextDueOn) {
       updatePayload.next_due_at = dateStringToISO(nextDueOn);
-      updatePayload.day_of_week = hasRecurrence
-        ? deriveDayOfWeekForChore(intervalValue, intervalUnit, nextDueOn)
-        : null;
+      updatePayload.day_of_week =
+        values.day_of_week != null
+          ? values.day_of_week
+          : hasRecurrence
+            ? deriveDayOfWeekForChore(intervalValue, intervalUnit, nextDueOn)
+            : null;
     }
 
     const ok = await onUpdateChore(editingChoreId, updatePayload);
     if (!ok) return;
 
     if (isSomeday) {
-      setViewMode('schedule');
       setScheduleFilter('someday');
     } else if (nextDueOn) {
-      setViewMode('schedule');
       setScheduleFilter(
         getScheduleFilterForChore({
           ...(editingChore as Chore),
@@ -370,49 +395,39 @@ export function ChoresView({
     if (editingChoreId === choreId) {
       setEditingChoreId(null);
     }
-  };
-
-  const renderChore = (chore: Chore) => {
-    if (editingChoreId === chore.id) {
-      return (
-        <ChoreForm
-          key={chore.id}
-          variant="inline"
-          mode="edit"
-          existingRooms={existingRooms}
-          initial={{
-            title: normalizeChoreTitle(chore.title),
-            room: chore.room ?? undefined,
-            time_estimate_minutes: chore.time_estimate_minutes,
-            is_someday: isChoreSomeday(chore),
-            repeats: Boolean(getChoreInterval(chore)),
-            interval_value: chore.interval_value ?? undefined,
-            interval_unit: chore.interval_unit ?? undefined,
-            next_due_on: nextDueAtToDateString(chore.next_due_at) ?? undefined,
-          }}
-          submitLabel="Save changes"
-          onSubmit={handleEditSave}
-          onCancel={() => setEditingChoreId(null)}
-          onRememberRoom={rememberRoom}
-          onDelete={async () => {
-            await handleDeleteChore(chore.id);
-          }}
-        />
-      );
+    if (detailChoreId === choreId) {
+      setDetailChoreId(null);
     }
-
-    return (
-      <ChoreCard
-        key={chore.id}
-        chore={chore}
-        isCompleting={chore.id === completingChoreId}
-        onComplete={(id) => void handleCompleteChore(id)}
-        onStart={(id) => void handleStartChore(id)}
-        onEdit={setEditingChoreId}
-        onDelete={(id) => void handleDeleteChore(id)}
-      />
-    );
   };
+
+  const renderChore = (chore: Chore) => (
+    <ChoreCard
+      key={chore.id}
+      chore={chore}
+      isCompleting={chore.id === completingChoreId}
+      onComplete={(id) => void handleCompleteChore(id)}
+      onStart={(id) => void handleStartChore(id)}
+      onEdit={setEditingChoreId}
+      onDelete={(id) => void handleDeleteChore(id)}
+      onOpenDetail={setDetailChoreId}
+    />
+  );
+
+  const detailChore = detailChoreId
+    ? chores.find((c) => c.id === detailChoreId) ?? null
+    : null;
+  const editingChore = editingChoreId
+    ? chores.find((c) => c.id === editingChoreId) ?? null
+    : null;
+
+  const timerContextMeta = activeChore
+    ? [
+        getChoreIntervalLabel(activeChore),
+        getChoreDueStatus(activeChore).label,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : null;
 
   const filteredEmptyMessage =
     scheduleFilter === 'overdue'
@@ -427,7 +442,7 @@ export function ChoresView({
             ? 'No scheduled chores'
             : 'No chores in this category';
 
-  const anySheetOpen = chooserOpen || taskSheetOpen || choreSheetOpen || repeatPrompt != null;
+  const anySheetOpen = choreSheetOpen || editingChoreId != null || repeatPrompt != null;
 
   const repeatPromptChore = repeatPrompt
     ? chores.find((c) => c.id === repeatPrompt.choreId)
@@ -443,6 +458,8 @@ export function ChoresView({
           isPaused={timer.isPaused}
           isCompleted={showCompletedState}
           completionSubline={completionSubline}
+          contextRoom={activeChore?.room?.trim() || null}
+          contextMeta={timerContextMeta}
           onMinimize={() => setFocusTimerExpanded(false)}
           onPauseResume={handlePauseOrResume}
           onComplete={handleCompleteFromTimer}
@@ -453,129 +470,139 @@ export function ChoresView({
         />
       ) : null}
 
-      <div className="relative flex flex-col p-4 pb-24 sm:p-6 md:pb-6">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-2">
-            <h1 className="text-[22px] font-semibold text-[#3D3530] md:text-xl">Chores</h1>
-            {totalOverdueCount > 0 ? (
+      {detailChore ? (
+        <ChoreDetailScreen
+          chore={detailChore}
+          onBack={() => setDetailChoreId(null)}
+          onStart={(id) => {
+            setDetailChoreId(null);
+            void handleStartChore(id);
+          }}
+          onEdit={(id) => {
+            setDetailChoreId(null);
+            setEditingChoreId(id);
+          }}
+        />
+      ) : mode === 'rooms' && !selectedRoom ? (
+        <RoomsOverview
+          rooms={roomSummaries}
+          loading={loading}
+          onSelectRoom={setSelectedRoom}
+        />
+      ) : (
+        <div className="relative flex flex-col px-6 pb-28 pt-6 md:pb-6">
+          {mode === 'rooms' && selectedRoom ? (
+            <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => handleScheduleFilterChange('overdue')}
-                className="shrink-0 rounded-full bg-[#C0463F16] px-2.5 py-0.5 text-[13px] font-medium text-[#C0463F] transition-colors hover:bg-[#C0463F24]"
+                onClick={() => setSelectedRoom(null)}
+                aria-label="Back to rooms"
+                className="flex size-6 items-center justify-center text-text-primary"
               >
-                {totalOverdueCount} overdue
+                <ArrowLeft size={24} strokeWidth={2} />
               </button>
-            ) : null}
-          </div>
-
-          <div
-            className="flex shrink-0 rounded-full bg-[#EFEBE3] p-0.5"
-            role="group"
-            aria-label="Group chores by"
-          >
-            <button
-              type="button"
-              onClick={() => handleViewModeChange('schedule')}
-              aria-pressed={viewMode === 'schedule'}
-              className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-medium transition-colors ${
-                viewMode === 'schedule'
-                  ? 'bg-[#3D3530] text-[#FAF8F3]'
-                  : 'bg-transparent text-[#938C7C]'
-              }`}
-            >
-              <CalendarDays size={12} strokeWidth={2} aria-hidden />
-              Schedule
-            </button>
-            <button
-              type="button"
-              onClick={() => handleViewModeChange('room')}
-              aria-pressed={viewMode === 'room'}
-              className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-medium transition-colors ${
-                viewMode === 'room'
-                  ? 'bg-[#3D3530] text-[#FAF8F3]'
-                  : 'bg-transparent text-[#938C7C]'
-              }`}
-            >
-              <Home size={12} strokeWidth={2} aria-hidden />
-              Room
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          {CHORE_SCHEDULE_FILTERS.map(({ id, label }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => handleScheduleFilterChange(id)}
-              className={`rounded-full border px-3 py-1 text-[15px] font-medium transition-colors md:text-xs ${
-                scheduleFilter === id ? FILTER_PILL_ACTIVE : FILTER_PILL_INACTIVE
-              }`}
-            >
-              {label} · {filterCounts[id]}
-            </button>
-          ))}
-        </div>
-
-        <div className="mt-6">
-          {loading ? (
-            <TaskQueueSkeleton />
-          ) : filteredChores.length === 0 ? (
-            <p className="py-4 text-center text-base text-text-faint md:text-sm">
-              {filteredEmptyMessage}
-            </p>
+              <h1 className="font-display text-[24px] leading-tight text-text-primary">
+                {selectedRoom}
+              </h1>
+            </div>
           ) : (
-            <div className="space-y-6">
-              {groupedChores.map((group) => (
-                <div key={group.label || 'all'}>
-                  {group.label ? (
-                    <p className="mb-3 text-[13px] font-medium uppercase tracking-wide text-text-faint md:text-[11px]">
-                      {group.label}
-                    </p>
-                  ) : null}
-                  <div className="space-y-2">
-                    {group.chores.map((chore) => renderChore(chore))}
-                  </div>
-                </div>
-              ))}
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2">
+                <h1 className="font-display text-[28px] leading-tight text-text-primary">
+                  Schedule
+                </h1>
+                {totalOverdueCount > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => handleScheduleFilterChange('overdue')}
+                    className="shrink-0 rounded-full bg-urgent-bg px-2.5 py-0.5 text-[13px] font-medium text-urgent transition-colors hover:bg-urgent/10"
+                  >
+                    {totalOverdueCount} overdue
+                  </button>
+                ) : null}
+              </div>
             </div>
           )}
+
+          {mode === 'schedule' ? (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {CHORE_SCHEDULE_FILTERS.map(({ id, label }) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => handleScheduleFilterChange(id)}
+                  className={`rounded-full border px-3 py-1 text-[15px] font-medium transition-colors md:text-xs ${
+                    scheduleFilter === id ? FILTER_PILL_ACTIVE : FILTER_PILL_INACTIVE
+                  }`}
+                >
+                  {label} · {filterCounts[id]}
+                </button>
+              ))}
+            </div>
+          ) : null}
+
+          <div className="mt-6">
+            {loading ? (
+              <TaskQueueSkeleton />
+            ) : filteredChores.length === 0 ? (
+              <p className="py-4 text-center text-base text-text-faint md:text-sm">
+                {mode === 'rooms'
+                  ? 'No chores in this room'
+                  : filteredEmptyMessage}
+              </p>
+            ) : (
+              <div className="space-y-6">
+                {groupedChores.map((group) => (
+                  <div key={group.label || 'all'}>
+                    {group.label ? (
+                      <p className="mb-3 text-[13px] font-medium uppercase tracking-wide text-text-faint md:text-[11px]">
+                        {group.label}
+                      </p>
+                    ) : null}
+                    <div className="space-y-4">
+                      {group.chores.map((chore) => renderChore(chore))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
-
-      <AddTypeChooserSheet
-        open={chooserOpen}
-        onClose={() => setChooserOpen(false)}
-        onSelectTask={() => {
-          setChooserOpen(false);
-          setTaskSheetOpen(true);
-        }}
-        onSelectChore={() => {
-          setChooserOpen(false);
-          setChoreSheetOpen(true);
-        }}
-      />
-
-      <AddTaskBottomSheet
-        key={`task-${sheetKey}`}
-        open={taskSheetOpen}
-        defaultDestination={'backlog' satisfies TaskDestination}
-        existingCategories={existingCategories}
-        onClose={() => setTaskSheetOpen(false)}
-        onAddToToday={addTodayTask}
-        onAddToBacklog={addBacklogTask}
-      />
+      )}
 
       <AddChoreBottomSheet
-        key={`chore-${sheetKey}`}
-        open={choreSheetOpen}
+        open={editingChore != null}
         existingRooms={existingRooms}
-        onClose={() => setChoreSheetOpen(false)}
-        onAddChore={onAddChore}
-        saveError={choresError}
+        chore={editingChore}
+        onClose={() => setEditingChoreId(null)}
+        onUpdateChore={async (_id, values) => {
+          await handleEditSave(values);
+        }}
+        onDeleteChore={handleDeleteChore}
         onRememberRoom={rememberRoom}
-        onChoreAdded={handleChoreAdded}
       />
+
+      {!hideFab ? (
+        <>
+          <AddChoreBottomSheet
+            key={`chore-${sheetKey}`}
+            open={choreSheetOpen}
+            existingRooms={existingRooms}
+            defaultRoom={selectedRoom}
+            onClose={() => setChoreSheetOpen(false)}
+            onAddChore={onAddChore}
+            saveError={choresError}
+            onRememberRoom={rememberRoom}
+            onChoreAdded={handleChoreAdded}
+          />
+
+          <AddTaskFab
+            onClick={openNewTask}
+            showOnDesktop
+            hidden={anySheetOpen || (timerActive && focusTimerExpanded)}
+          />
+        </>
+      ) : null}
 
       {repeatPromptChore ? (
         <ChoreRepeatPromptSheet
@@ -591,12 +618,6 @@ export function ChoresView({
           }}
         />
       ) : null}
-
-      <AddTaskFab
-        onClick={openChooser}
-        showOnDesktop
-        hidden={anySheetOpen || (timerActive && focusTimerExpanded)}
-      />
     </>
   );
 }

@@ -1,25 +1,38 @@
-import { PRIORITY_HEX, formatTimerDisplay, type Priority } from '../types';
+import { formatTimerDisplay } from '../types';
 
 interface FocusTimerDialProps {
-  priority: Priority;
   remainingSeconds: number;
   totalSeconds: number;
+  /** When true, show elapsed time instead of remaining (Figma style). */
+  showElapsed?: boolean;
 }
 
-const SIZE = 260;
-const STROKE = 8;
+const SIZE = 220;
+const STROKE = 10;
 const RADIUS = (SIZE - STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+const ACCENT = '#5c6bf0';
+const TRACK = '#e5e7eb';
 
-export function FocusTimerDial({ priority, remainingSeconds, totalSeconds }: FocusTimerDialProps) {
-  const colors = PRIORITY_HEX[priority];
-  const fraction =
-    totalSeconds > 0 ? Math.max(0, Math.min(1, remainingSeconds / totalSeconds)) : 0;
-  const dashOffset = CIRCUMFERENCE * (1 - fraction);
-  const displaySeconds = Math.max(0, remainingSeconds);
+export function FocusTimerDial({
+  remainingSeconds,
+  totalSeconds,
+  showElapsed = true,
+}: FocusTimerDialProps) {
+  const elapsed = Math.max(0, totalSeconds - Math.max(0, remainingSeconds));
+  const progress =
+    totalSeconds > 0 ? Math.max(0, Math.min(1, elapsed / totalSeconds)) : 0;
+  const dashOffset = CIRCUMFERENCE * (1 - progress);
+  const displaySeconds = showElapsed
+    ? elapsed
+    : Math.max(0, remainingSeconds);
+  const totalMinutes = Math.max(1, Math.round(totalSeconds / 60));
 
   return (
-    <div className="relative flex items-center justify-center" style={{ width: SIZE, height: SIZE }}>
+    <div
+      className="relative flex items-center justify-center"
+      style={{ width: SIZE, height: SIZE }}
+    >
       <svg
         width={SIZE}
         height={SIZE}
@@ -32,7 +45,7 @@ export function FocusTimerDial({ priority, remainingSeconds, totalSeconds }: Foc
           cy={SIZE / 2}
           r={RADIUS}
           fill="none"
-          stroke={colors.track}
+          stroke={TRACK}
           strokeWidth={STROKE}
         />
         <circle
@@ -40,7 +53,7 @@ export function FocusTimerDial({ priority, remainingSeconds, totalSeconds }: Foc
           cy={SIZE / 2}
           r={RADIUS}
           fill="none"
-          stroke={colors.solid}
+          stroke={ACCENT}
           strokeWidth={STROKE}
           strokeLinecap="round"
           strokeDasharray={CIRCUMFERENCE}
@@ -48,13 +61,18 @@ export function FocusTimerDial({ priority, remainingSeconds, totalSeconds }: Foc
           className="transition-[stroke-dashoffset] duration-1000 ease-linear"
         />
       </svg>
-      <span
-        className="absolute text-[42px] font-medium leading-none text-[#3D3530]"
-        aria-live="polite"
-        aria-atomic="true"
-      >
-        {formatTimerDisplay(displaySeconds)}
-      </span>
+      <div className="absolute flex flex-col items-center gap-1">
+        <span
+          className="text-[40px] font-extrabold leading-none text-text-primary tabular-nums"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          {formatTimerDisplay(displaySeconds)}
+        </span>
+        <span className="text-[14px] font-medium text-text-muted">
+          of {totalMinutes} min
+        </span>
+      </div>
     </div>
   );
 }

@@ -93,7 +93,7 @@ export function BottomSheet({
         <div
           role="dialog"
           aria-modal="true"
-          className="pointer-events-auto mx-auto w-full transform rounded-t-[20px] bg-[#FAF8F3] transition-transform duration-[250ms] ease-out md:max-w-3xl"
+          className="pointer-events-auto mx-auto w-full transform rounded-t-[32px] bg-surface transition-transform duration-[250ms] ease-out md:max-w-3xl"
           style={{ transform: sheetTransform }}
         >
           <div
@@ -102,7 +102,7 @@ export function BottomSheet({
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
           >
-            <div className="h-1 w-10 rounded-full bg-[#938C7C]/40" aria-hidden />
+            <div className="h-1 w-10 rounded-full bg-text-faint/40" aria-hidden />
           </div>
           {children}
         </div>

@@ -28,6 +28,7 @@ interface BacklogViewProps {
   onUndoComplete: (snapshot: Task) => Promise<void>;
   onScheduleForToday: (ids: string[]) => Promise<void>;
   onNavigateToToday: () => void;
+  hideFab?: boolean;
 }
 
 export function BacklogView({
@@ -46,6 +47,7 @@ export function BacklogView({
   onUndoComplete,
   onScheduleForToday,
   onNavigateToToday,
+  hideFab = false,
 }: BacklogViewProps) {
   const { dropTarget } = useBacklogDnd();
   const [planningMode, setPlanningMode] = useState(false);
@@ -179,9 +181,10 @@ export function BacklogView({
 
   return (
     <div
-      className={`relative flex flex-1 flex-col p-4 sm:p-6 ${planningMode ? 'pb-28 md:pb-6' : 'pb-24 md:pb-6'}`}
+      className={`relative flex flex-1 flex-col px-6 pt-6 ${planningMode ? 'pb-28 md:pb-6' : 'pb-28 md:pb-6'}`}
     >
-      <div>
+      <h1 className="font-display text-[28px] leading-tight text-text-primary">Backlog</h1>
+      <div className="mt-6">
         <Button
           variant="secondary"
           onClick={handlePlanMyDay}
@@ -193,7 +196,7 @@ export function BacklogView({
       </div>
 
       <p className="mt-6 text-[13px] font-medium uppercase tracking-wide text-text-faint md:text-[11px]">
-        Backlog
+        Unscheduled
       </p>
 
       <div className="mt-3">
@@ -249,7 +252,9 @@ export function BacklogView({
         />
       ) : null}
 
-      <AddTaskFab onClick={openChooser} showOnDesktop hidden={planningMode || anySheetOpen} />
+      {!hideFab ? (
+        <AddTaskFab onClick={openChooser} showOnDesktop hidden={planningMode || anySheetOpen} />
+      ) : null}
 
       {planningMode ? (
         <div className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-40 border-t border-border bg-surface px-4 py-3 md:static md:mt-6 md:rounded-[12px] md:border md:px-4 md:py-3">

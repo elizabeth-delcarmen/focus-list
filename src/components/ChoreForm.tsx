@@ -1,22 +1,50 @@
 import { useMemo, useState } from 'react';
+import { Calendar, ChevronDown, Clock, Minus, Plus, X } from 'lucide-react';
 import {
-  CHORE_RECURRENCE_OPTIONS,
-  TIME_CHIPS,
   getTodayDateString,
-  type ChoreRecurrencePreset,
-  type ChoreWhenChoice,
   type EditChoreInput,
   type IntervalUnit,
   type NewChoreInput,
 } from '../types';
 import {
-  formatChoreDueDate,
-  formatIntervalLabel,
-  getDueDatePreview,
-  dateStringToISO,
-  matchChoreFrequencyPreset,
+  dayOfWeekFromDateString,
   normalizeChoreTitle,
 } from '../lib/choreSchedule';
+
+type RecurrenceMode = 'once' | 'daily' | 'weekly' | 'monthly' | 'yearly';
+
+const RECURRENCE_OPTIONS: { id: RecurrenceMode; label: string }[] = [
+  { id: 'once', label: 'Once' },
+  { id: 'daily', label: 'Daily' },
+  { id: 'weekly', label: 'Weekly' },
+  { id: 'monthly', label: 'Monthly' },
+  { id: 'yearly', label: 'Yearly' },
+];
+
+const WEEKDAYS = [
+  { id: 0, label: 'Sun', full: 'Sunday' },
+  { id: 1, label: 'Mon', full: 'Monday' },
+  { id: 2, label: 'Tue', full: 'Tuesday' },
+  { id: 3, label: 'Wed', full: 'Wednesday' },
+  { id: 4, label: 'Thu', full: 'Thursday' },
+  { id: 5, label: 'Fri', full: 'Friday' },
+  { id: 6, label: 'Sat', full: 'Saturday' },
+] as const;
+
+const MONTHS = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+] as const;
 
 interface ChoreFormProps {
   existingRooms: string[];
@@ -25,253 +53,269 @@ interface ChoreFormProps {
   submitLabel?: string;
   variant?: 'sheet' | 'inline';
   saveError?: string | null;
+  defaultRoom?: string | null;
   onRememberRoom?: (room: string) => void;
   onSubmit: (values: NewChoreInput | EditChoreInput) => Promise<void>;
   onCancel: () => void;
   onDelete?: () => Promise<void>;
 }
 
-function SectionLabel({ children }: { children: string }) {
+function FieldLabel({ children }: { children: string }) {
   return (
-    <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-[#938C7C]">
+    <p className="text-[12px] font-bold uppercase tracking-wide text-black">
       {children}
     </p>
   );
 }
 
-function SelectChip({
-  selected,
-  onClick,
-  children,
-}: {
-  selected: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-full border px-3 py-1 text-[15px] font-medium transition-colors md:text-xs ${
-        selected
-          ? 'border-[#3D3530] bg-[#3D3530] text-white'
-          : 'border-[#D8D2C4] bg-white text-[#938C7C] hover:text-[#3D3530]'
-      }`}
-    >
-      {children}
-    </button>
-  );
+function formatDisplayDate(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  return date.toLocaleDateString('en-GB', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'short',
+  });
 }
 
-function inferWhenChoice(initial?: Partial<NewChoreInput>): ChoreWhenChoice {
-  if (initial?.is_someday) return 'someday';
-  const dueOn = initial?.next_due_on;
-  if (!dueOn) return 'today';
-  if (dueOn === getTodayDateString()) return 'today';
-  return 'pick';
+function ordinal(n: number): string {
+  const v = n % 100;
+  if (v >= 11 && v <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1:
+      return `${n}st`;
+    case 2:
+      return `${n}nd`;
+    case 3:
+      return `${n}rd`;
+    default:
+      return `${n}th`;
+  }
 }
 
-function inferRecurrence(
-  initial?: Partial<NewChoreInput>,
-): ChoreRecurrencePreset | null {
-  if (initial?.is_someday || !initial?.repeats) return null;
-  const preset = matchChoreFrequencyPreset(
-    true,
-    initial?.interval_value,
-    initial?.interval_unit,
-  );
-  if (preset && preset !== 'someday') return preset;
-  return null;
+function unitLabel(mode: RecurrenceMode, count: number): string {
+  if (mode === 'daily') return count === 1 ? 'day' : 'days';
+  if (mode === 'weekly') return count === 1 ? 'week' : 'weeks';
+  if (mode === 'monthly') return count === 1 ? 'month' : 'months';
+  return count === 1 ? 'year' : 'years';
+}
+
+function inferRecurrenceMode(initial?: Partial<NewChoreInput>): RecurrenceMode {
+  if (!initial?.repeats || initial.is_someday) return 'once';
+  const value = initial.interval_value ?? 1;
+  const unit = initial.interval_unit;
+  if (unit === 'days') return 'daily';
+  if (unit === 'weeks') return 'weekly';
+  if (unit === 'months') {
+    if (value % 12 === 0) return 'yearly';
+    return 'monthly';
+  }
+  return 'once';
+}
+
+function dateWithDayOfMonth(base: string, day: number): string {
+  const [y, m] = base.split('-').map(Number);
+  const lastDay = new Date(y, m, 0).getDate();
+  const clamped = Math.min(day, lastDay);
+  return `${y}-${String(m).padStart(2, '0')}-${String(clamped).padStart(2, '0')}`;
+}
+
+function dateWithMonth(base: string, monthIndex: number): string {
+  const [y, , d] = base.split('-').map(Number);
+  const lastDay = new Date(y, monthIndex + 1, 0).getDate();
+  const clamped = Math.min(d, lastDay);
+  return `${y}-${String(monthIndex + 1).padStart(2, '0')}-${String(clamped).padStart(2, '0')}`;
+}
+
+function nextDateForWeekday(base: string, weekday: number): string {
+  const [y, m, d] = base.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  const current = date.getDay();
+  const delta = (weekday - current + 7) % 7;
+  date.setDate(date.getDate() + delta);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
 export function ChoreForm({
   existingRooms,
   initial,
   mode = 'add',
-  submitLabel = 'Add chore',
+  submitLabel = 'Save Task',
   variant = 'sheet',
   saveError,
+  defaultRoom = null,
   onRememberRoom,
   onSubmit,
   onCancel,
   onDelete,
 }: ChoreFormProps) {
-  const initialWhen = inferWhenChoice(initial);
-  const initialRecurrence = inferRecurrence(initial);
-  const initialHasRecurrence = Boolean(initial?.repeats && !initial?.is_someday);
-  const initialIntervalValue = initial?.interval_value ?? 1;
-  const initialIntervalUnit = initial?.interval_unit ?? 'weeks';
-  const initialPreset = matchChoreFrequencyPreset(
-    initialHasRecurrence,
-    initialIntervalValue,
-    initialIntervalUnit,
-  );
+  const inferredMode = inferRecurrenceMode(initial);
+  const initialInterval = initial?.interval_value ?? 1;
+  const initialEvery =
+    inferredMode === 'yearly' ? Math.max(1, Math.round(initialInterval / 12)) : initialInterval;
 
   const [title, setTitle] = useState(initial?.title ?? '');
-  const [room, setRoom] = useState<string | null>(initial?.room ?? null);
-  const [newRoomMode, setNewRoomMode] = useState(false);
+  const [room, setRoom] = useState<string>(
+    initial?.room ?? defaultRoom ?? existingRooms[0] ?? '',
+  );
+  const [showRoomPicker, setShowRoomPicker] = useState(false);
   const [newRoomValue, setNewRoomValue] = useState('');
-  const [whenChoice, setWhenChoice] = useState<ChoreWhenChoice>(
-    () => initialWhen ?? (mode === 'add' ? 'today' : 'someday'),
+  const [dueOn, setDueOn] = useState(
+    () => initial?.next_due_on ?? getTodayDateString(),
   );
-  const [recurrence, setRecurrence] = useState<ChoreRecurrencePreset | null>(
-    () => initialRecurrence ?? null,
+  const [timeEstimate, setTimeEstimate] = useState(
+    initial?.time_estimate_minutes ?? 30,
   );
-  const [pickedDueOn, setPickedDueOn] = useState<string | null>(() => {
-    if (initialWhen === 'pick' && initial?.next_due_on) return initial.next_due_on;
-    return null;
+  const [scheduleEnabled, setScheduleEnabled] = useState(
+    () => mode === 'edit' && !initial?.is_someday,
+  );
+  const [recurrence, setRecurrence] = useState<RecurrenceMode>(inferredMode);
+  const [everyCount, setEveryCount] = useState(Math.max(1, initialEvery));
+  const [weekday, setWeekday] = useState(() => {
+    if (initial?.day_of_week != null) return initial.day_of_week;
+    if (initial?.next_due_on) return dayOfWeekFromDateString(initial.next_due_on);
+    return dayOfWeekFromDateString(getTodayDateString());
   });
-  const initialMinutes = initial?.time_estimate_minutes ?? 25;
-  const [timeEstimate, setTimeEstimate] = useState(initialMinutes);
-  const [customEstimate, setCustomEstimate] = useState(() => {
-    const mins = initial?.time_estimate_minutes;
-    if (mins != null && !(TIME_CHIPS as readonly number[]).includes(mins)) {
-      return String(mins);
-    }
-    return '';
+  const [monthDay, setMonthDay] = useState(() => {
+    const src = initial?.next_due_on ?? getTodayDateString();
+    return Number(src.split('-')[2]) || 1;
+  });
+  const [yearMonth, setYearMonth] = useState(() => {
+    const src = initial?.next_due_on ?? getTodayDateString();
+    return Math.max(0, Number(src.split('-')[1]) - 1);
   });
   const [submitting, setSubmitting] = useState(false);
 
-  const isSomeday = whenChoice === 'someday';
-  const showRecurrence = !isSomeday;
-  const customFrequencyLabel =
-    showRecurrence && recurrence === null && initialHasRecurrence && initialPreset === null
-      ? formatIntervalLabel(initialIntervalValue, initialIntervalUnit)
-      : null;
-
-  const firstDueOn = useMemo(() => {
-    if (isSomeday) return '';
-    if (whenChoice === 'today') return getTodayDateString();
-    if (whenChoice === 'pick') return pickedDueOn ?? getTodayDateString();
-    if (mode === 'edit' && initial?.next_due_on && whenChoice === initialWhen) {
-      return initial.next_due_on;
-    }
-    return '';
-  }, [isSomeday, whenChoice, pickedDueOn, mode, initial, initialWhen]);
-
-  const dueDatePreview = useMemo(() => {
-    if (isSomeday || !firstDueOn) return null;
-    return getDueDatePreview(firstDueOn);
-  }, [isSomeday, firstDueOn]);
-
-  const canSubmit = Boolean(title.trim()) && (isSomeday || Boolean(firstDueOn));
-
   const displayRooms = useMemo(() => {
     const names = new Set(existingRooms);
-    if (room) names.add(room);
+    if (room.trim()) names.add(room.trim());
     return [...names].sort((a, b) => a.localeCompare(b));
   }, [existingRooms, room]);
 
-  const handleRoomSelect = (selectedRoom: string) => {
-    setNewRoomMode(false);
-    setNewRoomValue('');
-    setRoom(selectedRoom);
-  };
-
-  const handleNewRoomApply = () => {
-    const trimmed = newRoomValue.trim();
-    if (!trimmed) return;
-    setRoom(trimmed);
-    onRememberRoom?.(trimmed);
-    setNewRoomMode(false);
-    setNewRoomValue('');
-  };
-
-  const resolveRoom = (): string | undefined => {
-    if (newRoomMode) {
-      const trimmed = newRoomValue.trim();
-      return trimmed || undefined;
+  const summary = useMemo(() => {
+    if (recurrence === 'once') {
+      return `Complete on ${formatDisplayDate(dueOn)}`;
     }
-    return room ?? undefined;
-  };
-
-  const selectPickDate = () => {
-    setWhenChoice('pick');
-    setPickedDueOn((current) => current ?? getTodayDateString());
-  };
-
-  const handleWhenChange = (next: ChoreWhenChoice) => {
-    setWhenChoice(next);
-    if (next === 'someday') {
-      setRecurrence(null);
-      setPickedDueOn(null);
-    } else if (next === 'today') {
-      setPickedDueOn(null);
+    if (recurrence === 'daily') {
+      return everyCount === 1
+        ? 'Complete every day'
+        : `Complete every ${everyCount} days`;
     }
-  };
-
-  const handleDatePicked = (value: string) => {
-    if (!value) return;
-    setWhenChoice('pick');
-    setPickedDueOn(value);
-  };
-
-  const toggleRecurrence = (id: ChoreRecurrencePreset) => {
-    setRecurrence((current) => (current === id ? null : id));
-  };
-
-  const selectTimeChip = (minutes: number) => {
-    setTimeEstimate(minutes);
-    setCustomEstimate('');
-  };
-
-  const handleCustomEstimate = (value: string) => {
-    setCustomEstimate(value);
-    const parsed = parseInt(value, 10);
-    if (!Number.isNaN(parsed) && parsed > 0) {
-      setTimeEstimate(parsed);
+    if (recurrence === 'weekly') {
+      const dayName = WEEKDAYS.find((d) => d.id === weekday)?.full ?? 'day';
+      return everyCount === 1
+        ? `Complete every week on ${dayName}`
+        : `Complete every ${everyCount} weeks on ${dayName}`;
     }
+    if (recurrence === 'monthly') {
+      return everyCount === 1
+        ? `Complete every month on the ${ordinal(monthDay)}`
+        : `Complete every ${everyCount} months on the ${ordinal(monthDay)}`;
+    }
+    const monthName = MONTHS[yearMonth] ?? 'month';
+    return everyCount === 1
+      ? `Complete every year in ${monthName}`
+      : `Complete every ${everyCount} years in ${monthName}`;
+  }, [recurrence, dueOn, everyCount, weekday, monthDay, yearMonth]);
+
+  const canSubmit = Boolean(title.trim());
+
+  const bumpEvery = (delta: number) => {
+    setEveryCount((n) => Math.max(1, Math.min(99, n + delta)));
   };
 
-  const resolveInterval = (): { intervalValue: number; intervalUnit: IntervalUnit } | null => {
-    if (recurrence) {
-      const option = CHORE_RECURRENCE_OPTIONS.find((item) => item.id === recurrence)!;
-      return { intervalValue: option.interval_value, intervalUnit: option.interval_unit };
+  const resolveInterval = (): {
+    repeats: boolean;
+    intervalValue?: number;
+    intervalUnit?: IntervalUnit;
+    dayOfWeek?: number | null;
+    nextDueOn: string;
+  } => {
+    if (recurrence === 'once') {
+      return { repeats: false, nextDueOn: dueOn, dayOfWeek: null };
     }
-    if (mode === 'edit' && initialHasRecurrence && initialPreset === null) {
-      return { intervalValue: initialIntervalValue, intervalUnit: initialIntervalUnit };
+    if (recurrence === 'daily') {
+      return {
+        repeats: true,
+        intervalValue: everyCount,
+        intervalUnit: 'days',
+        nextDueOn: dueOn,
+        dayOfWeek: null,
+      };
     }
-    return null;
+    if (recurrence === 'weekly') {
+      return {
+        repeats: true,
+        intervalValue: everyCount,
+        intervalUnit: 'weeks',
+        dayOfWeek: weekday,
+        nextDueOn: nextDateForWeekday(dueOn, weekday),
+      };
+    }
+    if (recurrence === 'monthly') {
+      return {
+        repeats: true,
+        intervalValue: everyCount,
+        intervalUnit: 'months',
+        nextDueOn: dateWithDayOfMonth(dueOn, monthDay),
+        dayOfWeek: null,
+      };
+    }
+    return {
+      repeats: true,
+      intervalValue: everyCount * 12,
+      intervalUnit: 'months',
+      nextDueOn: dateWithMonth(dateWithDayOfMonth(dueOn, monthDay), yearMonth),
+      dayOfWeek: null,
+    };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (submitting || !canSubmit) return;
-
     setSubmitting(true);
     try {
-      const normalizedTitle = normalizeChoreTitle(title);
-      const hasRecurrence = Boolean(recurrence);
-      const interval = hasRecurrence ? resolveInterval() : null;
-      const resolvedRoom = resolveRoom();
+      const resolvedRoom = room.trim() || undefined;
       if (resolvedRoom) onRememberRoom?.(resolvedRoom);
 
+      if (!scheduleEnabled) {
+        const someday: NewChoreInput = {
+          title: normalizeChoreTitle(title),
+          room: resolvedRoom,
+          time_estimate_minutes: timeEstimate,
+          is_someday: true,
+          repeats: false,
+          day_of_week: null,
+        };
+
+        if (mode === 'edit') {
+          await onSubmit({
+            ...someday,
+            next_due_on_changed: true,
+          });
+        } else {
+          await onSubmit(someday);
+        }
+        return;
+      }
+
+      const resolved = resolveInterval();
       const base: NewChoreInput = {
-        title: normalizedTitle,
+        title: normalizeChoreTitle(title),
         room: resolvedRoom,
         time_estimate_minutes: timeEstimate,
-        is_someday: isSomeday,
-        repeats: hasRecurrence,
-        interval_value: interval?.intervalValue,
-        interval_unit: interval?.intervalUnit,
-        next_due_on: isSomeday ? undefined : firstDueOn,
+        is_someday: false,
+        repeats: resolved.repeats,
+        interval_value: resolved.intervalValue,
+        interval_unit: resolved.intervalUnit,
+        day_of_week: resolved.dayOfWeek,
+        next_due_on: resolved.nextDueOn,
       };
 
       if (mode === 'edit') {
-        const wasSomeday = initial?.is_someday === true;
-        const enablingSchedule = !isSomeday && wasSomeday;
-        const scheduleChanged =
-          recurrence !== initialPreset ||
-          whenChoice !== initialWhen ||
-          (whenChoice === 'pick' && pickedDueOn !== (initial?.next_due_on ?? null)) ||
-          (whenChoice === 'today' && initialWhen !== 'today');
-        const dueDateChanged =
-          whenChoice === 'pick' ? Boolean(pickedDueOn) : whenChoice === 'today';
-
         await onSubmit({
           ...base,
-          next_due_on_changed:
-            enablingSchedule || dueDateChanged || (scheduleChanged && !isSomeday),
+          next_due_on_changed: true,
         });
       } else {
         await onSubmit(base);
@@ -281,206 +325,324 @@ export function ChoreForm({
     }
   };
 
+  const inputClass =
+    'w-full rounded-[12px] border border-[#e5e7eb] bg-[#f3f4fb] px-4 py-4 text-[15px] text-text-primary outline-none focus:border-accent';
+
   return (
     <form
       onSubmit={handleSubmit}
       className={
         variant === 'sheet'
-          ? 'px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-1'
-          : 'rounded-[12px] border border-dashed border-border bg-surface p-4'
+          ? 'max-h-[min(85dvh,720px)] overflow-y-auto px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-2'
+          : 'rounded-[20px] border border-[#e5e7eb] bg-surface p-5'
       }
     >
-      <input
-        type="text"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        placeholder="Chore name"
-        autoComplete="off"
-        autoCorrect="off"
-        autoFocus
-        className="w-full rounded-full border border-[#D8D2C4] bg-[#FAF8F3] px-[14px] py-[14px] text-base text-[#3D3530] outline-none placeholder:text-[#938C7C] focus:border-[#3D3530] md:text-[15px]"
-      />
-
-      <div className="mt-4">
-        <SectionLabel>Room</SectionLabel>
-        <div className="flex flex-wrap gap-2">
-          {displayRooms.map((name) => (
-            <SelectChip
-              key={name}
-              selected={room === name && !newRoomMode}
-              onClick={() => handleRoomSelect(name)}
-            >
-              {name}
-            </SelectChip>
-          ))}
-          <SelectChip
-            selected={newRoomMode}
-            onClick={() => {
-              setNewRoomMode(true);
-              setRoom(null);
-            }}
+      {variant === 'sheet' ? (
+        <div className="mb-6 flex items-center justify-between">
+          <h2 className="font-display text-[24px] text-text-primary">
+            {mode === 'edit' ? 'Edit Task' : 'New Task'}
+          </h2>
+          <button
+            type="button"
+            onClick={onCancel}
+            aria-label="Close"
+            className="flex size-8 items-center justify-center rounded-[16px] bg-[#f3f4fb] text-text-muted"
           >
-            + New
-          </SelectChip>
-        </div>
-        {newRoomMode ? (
-          <div className="mt-2 flex gap-2">
-            <input
-              type="text"
-              value={newRoomValue}
-              onChange={(e) => setNewRoomValue(e.target.value)}
-              placeholder="Room name"
-              autoFocus
-              className="min-w-0 flex-1 rounded-full border border-[#D8D2C4] bg-[#FAF8F3] px-4 py-2 text-base text-[#3D3530] outline-none placeholder:text-[#938C7C] focus:border-[#3D3530] md:text-sm"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleNewRoomApply();
-                }
-              }}
-            />
-            <button
-              type="button"
-              onClick={handleNewRoomApply}
-              disabled={!newRoomValue.trim()}
-              className="shrink-0 rounded-full bg-[#3D3530] px-4 py-2 text-[14px] font-medium text-white disabled:opacity-40"
-            >
-              Add
-            </button>
-          </div>
-        ) : null}
-      </div>
-
-      <div className="mt-4">
-        <SectionLabel>
-          {mode === 'edit' && initialHasRecurrence && !isSomeday && whenChoice === initialWhen
-            ? "When's this due?"
-            : "When's this first due?"}
-        </SectionLabel>
-        <div className="flex flex-wrap gap-2">
-          <SelectChip selected={whenChoice === 'today'} onClick={() => handleWhenChange('today')}>
-            Today
-          </SelectChip>
-          <SelectChip
-            selected={whenChoice === 'pick'}
-            onClick={selectPickDate}
-          >
-            Pick a date
-          </SelectChip>
-          <SelectChip selected={whenChoice === 'someday'} onClick={() => handleWhenChange('someday')}>
-            Someday
-          </SelectChip>
-        </div>
-
-        {whenChoice === 'pick' ? (
-          <input
-            type="date"
-            value={pickedDueOn ?? getTodayDateString()}
-            onChange={(e) => handleDatePicked(e.target.value)}
-            className="mt-2 w-full rounded-[12px] border border-[#D8D2C4] bg-[#FAF8F3] px-[14px] py-[14px] text-base text-[#3D3530] outline-none focus:border-[#3D3530] md:text-[15px]"
-          />
-        ) : null}
-
-        {isSomeday ? (
-          <p className="mt-2 text-[14px] font-normal text-[#938C7C] md:text-[13px]">
-            No due date yet — tracked by room until you schedule or complete it.
-          </p>
-        ) : null}
-
-        {!isSomeday && firstDueOn && dueDatePreview ? (
-          <p
-            className={`mt-3 text-[13px] font-normal md:text-[12px] ${
-              dueDatePreview.isOverdue ? 'text-[#C0463F]' : 'text-[#938C7C]'
-            }`}
-          >
-            {mode === 'edit' && initialHasRecurrence && whenChoice === initialWhen
-              ? `Next due ${formatChoreDueDate(dateStringToISO(firstDueOn)).toLowerCase()}`
-              : `First due ${formatChoreDueDate(dateStringToISO(firstDueOn)).toLowerCase()}`}
-            {dueDatePreview.isOverdue ? ' · overdue' : null}
-          </p>
-        ) : null}
-      </div>
-
-      {showRecurrence ? (
-        <div className="mt-4">
-          <SectionLabel>How often after that?</SectionLabel>
-          <div className="flex flex-wrap gap-2">
-            {CHORE_RECURRENCE_OPTIONS.map(({ id, label }) => (
-              <SelectChip
-                key={id}
-                selected={recurrence === id}
-                onClick={() => toggleRecurrence(id)}
-              >
-                {label}
-              </SelectChip>
-            ))}
-          </div>
-
-          {customFrequencyLabel ? (
-            <p className="mt-2 text-[13px] font-normal text-[#938C7C] md:text-[12px]">
-              Currently {customFrequencyLabel.toLowerCase()}. Pick an option above to change it.
-            </p>
-          ) : null}
+            <X size={16} strokeWidth={2} />
+          </button>
         </div>
       ) : null}
 
-      <div className="mt-4">
-        <SectionLabel>Time estimate</SectionLabel>
-        <div className="flex flex-wrap gap-2">
-          {TIME_CHIPS.map((mins) => (
-            <button
-              key={mins}
-              type="button"
-              onClick={() => selectTimeChip(mins)}
-              className={`rounded-full px-3 py-1 text-[15px] font-medium transition-colors md:text-xs ${
-                timeEstimate === mins && !customEstimate
-                  ? 'bg-accent-soft text-accent'
-                  : 'bg-surface-raised text-text-muted hover:text-text-primary'
-              }`}
-            >
-              {mins}m
-            </button>
-          ))}
+      <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-2">
+          <FieldLabel>Task Name</FieldLabel>
           <input
-            type="number"
-            min={1}
-            value={customEstimate}
-            onChange={(e) => handleCustomEstimate(e.target.value)}
-            placeholder="Custom"
-            className="w-20 rounded-full border border-border bg-bg px-3 py-1 text-base text-text-primary outline-none placeholder:text-base placeholder:text-text-faint focus:border-accent md:text-xs md:placeholder:text-xs"
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Organise black cabinet"
+            autoComplete="off"
+            autoCorrect="off"
+            autoFocus={mode === 'add'}
+            className={inputClass}
           />
         </div>
-      </div>
 
-      <div className={`mt-6 flex gap-2 ${variant === 'inline' && onDelete ? 'flex-wrap' : ''}`}>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="flex-1 rounded-full border border-[#D8D2C4] bg-transparent py-3 text-[15px] font-medium text-[#3D3530]"
-        >
-          Cancel
-        </button>
-        <button
-          type="submit"
-          disabled={!canSubmit || submitting}
-          className="flex-1 rounded-full bg-[#3D3530] py-3 text-[15px] font-semibold text-[#FAF8F3] disabled:opacity-40"
-        >
-          {submitLabel}
-        </button>
-        {onDelete && variant === 'inline' ? (
+        <div className="flex flex-col gap-2">
+          <FieldLabel>Room</FieldLabel>
           <button
             type="button"
-            onClick={() => void onDelete()}
-            className="ml-auto rounded-full border border-urgent-border px-4 py-2 text-[15px] font-medium text-urgent transition-colors hover:bg-urgent-bg md:text-sm"
+            onClick={() => setShowRoomPicker((v) => !v)}
+            className={`${inputClass} flex items-center justify-between text-left`}
           >
-            Delete
+            <span>{room.trim() || 'Select a room'}</span>
+            <ChevronDown size={16} className="text-text-muted" />
           </button>
+          {showRoomPicker ? (
+            <div className="rounded-[12px] border border-[#e5e7eb] bg-surface p-2">
+              <div className="flex max-h-40 flex-col gap-1 overflow-y-auto">
+                {displayRooms.map((name) => (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => {
+                      setRoom(name);
+                      setShowRoomPicker(false);
+                    }}
+                    className={`rounded-[10px] px-3 py-2 text-left text-[14px] ${
+                      room === name
+                        ? 'bg-accent text-white'
+                        : 'text-text-primary hover:bg-[#f3f4fb]'
+                    }`}
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-2 flex gap-2 border-t border-[#e5e7eb] pt-2">
+                <input
+                  type="text"
+                  value={newRoomValue}
+                  onChange={(e) => setNewRoomValue(e.target.value)}
+                  placeholder="New room"
+                  className="min-w-0 flex-1 rounded-[10px] border border-[#e5e7eb] bg-[#f3f4fb] px-3 py-2 text-[14px] outline-none"
+                />
+                <button
+                  type="button"
+                  disabled={!newRoomValue.trim()}
+                  onClick={() => {
+                    const trimmed = newRoomValue.trim();
+                    if (!trimmed) return;
+                    setRoom(trimmed);
+                    onRememberRoom?.(trimmed);
+                    setNewRoomValue('');
+                    setShowRoomPicker(false);
+                  }}
+                  className="rounded-[10px] bg-accent px-3 py-2 text-[13px] font-semibold text-white disabled:opacity-40"
+                >
+                  Add
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <FieldLabel>Estimated Time</FieldLabel>
+          <div className="flex items-center gap-2 rounded-[12px] bg-[#f7f7fa] px-4 py-4">
+            <Clock size={14} className="text-text-muted" aria-hidden />
+            <input
+              type="number"
+              min={1}
+              value={timeEstimate}
+              onChange={(e) => {
+                const parsed = parseInt(e.target.value, 10);
+                if (!Number.isNaN(parsed) && parsed > 0) setTimeEstimate(parsed);
+              }}
+              className="min-w-0 flex-1 bg-transparent text-[16px] text-text-primary outline-none"
+            />
+            <span className="text-[14px] text-text-muted">min</span>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between py-4">
+          <span className="text-[14px] font-medium text-[#4a5463]">Set Schedule</span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={scheduleEnabled}
+            aria-label="Set Schedule"
+            onClick={() => setScheduleEnabled((v) => !v)}
+            className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+              scheduleEnabled ? 'bg-accent' : 'bg-[#d1d5db]'
+            }`}
+          >
+            <span
+              className={`absolute top-0.5 left-0.5 size-5 rounded-full bg-white shadow-sm transition-transform ${
+                scheduleEnabled ? 'translate-x-5' : 'translate-x-0'
+              }`}
+            />
+          </button>
+        </div>
+
+        {scheduleEnabled ? (
+          <>
+            <div className="flex flex-col gap-2">
+              <FieldLabel>Starting On</FieldLabel>
+              <label className={`${inputClass} relative flex cursor-pointer items-center gap-3`}>
+                <Calendar size={20} className="pointer-events-none text-text-muted" aria-hidden />
+                <span className="pointer-events-none flex-1">{formatDisplayDate(dueOn)}</span>
+                <input
+                  type="date"
+                  value={dueOn}
+                  onChange={(e) => {
+                    if (!e.target.value) return;
+                    setDueOn(e.target.value);
+                    setMonthDay(Number(e.target.value.split('-')[2]) || monthDay);
+                    setWeekday(dayOfWeekFromDateString(e.target.value));
+                    setYearMonth(Math.max(0, Number(e.target.value.split('-')[1]) - 1));
+                  }}
+                  onClick={(e) => {
+                    const input = e.currentTarget;
+                    try {
+                      input.showPicker?.();
+                    } catch {
+                      // Older browsers open via the native click instead.
+                    }
+                  }}
+                  className="absolute inset-0 cursor-pointer opacity-0"
+                />
+              </label>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <FieldLabel>Recurrence</FieldLabel>
+              <div className="flex gap-1">
+                {RECURRENCE_OPTIONS.map(({ id, label }) => {
+                  const selected = recurrence === id;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setRecurrence(id)}
+                      className={`flex-1 rounded-[10px] py-2.5 text-[11px] font-semibold ${
+                        selected
+                          ? 'bg-[#4e5ddc] text-white'
+                          : 'border border-[#e5e7eb] bg-[#f3f4fb] text-text-muted'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {recurrence !== 'once' ? (
+              <div className="flex items-center justify-between">
+                <p className="text-[12px] font-bold uppercase tracking-wide text-text-muted">
+                  Every
+                </p>
+                <div className="flex items-center gap-5">
+                  <button
+                    type="button"
+                    onClick={() => bumpEvery(-1)}
+                    aria-label="Decrease"
+                    className="flex size-8 items-center justify-center rounded-[16px] border border-[#e5e7eb] bg-[#f3f4fb]"
+                  >
+                    <Minus size={14} />
+                  </button>
+                  <span className="min-w-[4.5rem] text-center text-[16px] font-semibold text-text-primary">
+                    {everyCount} {unitLabel(recurrence, everyCount)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => bumpEvery(1)}
+                    aria-label="Increase"
+                    className="flex size-8 items-center justify-center rounded-[16px] border border-[#e5e7eb] bg-[#f3f4fb]"
+                  >
+                    <Plus size={14} />
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            {recurrence === 'weekly' ? (
+              <div className="flex justify-between gap-1">
+                {WEEKDAYS.map((day) => {
+                  const selected = weekday === day.id;
+                  return (
+                    <button
+                      key={day.id}
+                      type="button"
+                      onClick={() => setWeekday(day.id)}
+                      className={`flex size-10 items-center justify-center rounded-[20px] text-[12px] font-semibold ${
+                        selected
+                          ? 'bg-[#4e5ddc] text-white'
+                          : 'border border-[#e5e7eb] bg-surface text-text-muted'
+                      }`}
+                    >
+                      {day.label}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+
+            {recurrence === 'monthly' ? (
+              <div className="grid grid-cols-7 gap-1">
+                {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => {
+                  const selected = monthDay === day;
+                  return (
+                    <button
+                      key={day}
+                      type="button"
+                      onClick={() => setMonthDay(day)}
+                      className={`flex h-9 items-center justify-center rounded-[8px] text-[13px] ${
+                        selected
+                          ? 'bg-[#4e5ddc] font-bold text-white'
+                          : 'bg-[#f3f4fb] text-text-primary'
+                      }`}
+                    >
+                      {day}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+
+            {recurrence === 'yearly' ? (
+              <div className="max-h-[200px] overflow-y-auto rounded-[12px] border border-[#e5e7eb]">
+                {MONTHS.map((name, index) => {
+                  const selected = yearMonth === index;
+                  return (
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={() => setYearMonth(index)}
+                      className="flex w-full items-center justify-between border-b border-[#e5e7eb] px-3 py-3 text-left last:border-b-0"
+                    >
+                      <span className="text-[14px] text-text-primary">{name}</span>
+                      <span
+                        className={`flex size-5 items-center justify-center rounded-[10px] border-2 border-[#4e5ddc] ${
+                          selected ? 'bg-[#4e5ddc]' : 'bg-transparent'
+                        }`}
+                      >
+                        {selected ? (
+                          <span className="size-2.5 rounded-[5px] bg-white" />
+                        ) : null}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+
+            <p className="text-center text-[13px] text-text-muted">{summary}</p>
+          </>
         ) : null}
       </div>
+
+      <button
+        type="submit"
+        disabled={!canSubmit || submitting}
+        className="mt-6 flex h-14 w-full items-center justify-center rounded-[16px] bg-[#4e5ddc] text-[18px] font-bold text-white disabled:opacity-40"
+      >
+        {submitting ? 'Saving…' : submitLabel}
+      </button>
+
+      {onDelete && mode === 'edit' ? (
+        <button
+          type="button"
+          onClick={() => void onDelete()}
+          className="mt-3 w-full text-center text-[14px] font-medium text-urgent"
+        >
+          Delete
+        </button>
+      ) : null}
+
       {saveError && mode === 'add' ? (
-        <p className="mt-2 text-center text-[13px] font-normal text-[#C0463F] md:text-[12px]">
-          {saveError}
-        </p>
+        <p className="mt-2 text-center text-[13px] text-urgent">{saveError}</p>
       ) : null}
     </form>
   );

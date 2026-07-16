@@ -53,9 +53,9 @@ export function SignInScreen({ onSignIn, onSignInWithLink }: SignInScreenProps) 
   return (
     <div className="flex min-h-screen items-center justify-center bg-bg px-4">
       <div className="w-full max-w-sm text-center">
-        <h1 className="mb-2 text-2xl font-semibold text-text-primary">Focus List</h1>
+        <h1 className="mb-2 font-display text-[32px] text-text-primary">Focus List</h1>
         <p className="mb-8 text-base text-text-muted md:text-sm">
-          Daily task planning with focus timers
+          Home chores and daily focus, room by room
         </p>
 
         {sent ? (

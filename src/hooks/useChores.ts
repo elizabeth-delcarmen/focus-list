@@ -9,6 +9,7 @@ import {
   normalizeChoreTitle,
 } from '../lib/choreSchedule';
 import { requireSupabase } from '../lib/supabase';
+import { normalizeRoomName } from '../lib/roomIcons';
 import type { Chore, ChoreRecurrenceChoice, NewChoreInput } from '../types';
 
 interface UseChoresResult {
@@ -52,7 +53,30 @@ export function useChores(userId: string | undefined): UseChoresResult {
       setError(fetchError.message);
       setChores([]);
     } else {
-      setChores((data as Chore[]) ?? []);
+      const rows = (data as Chore[]) ?? [];
+      const needsRename = rows.filter(
+        (chore) => chore.room != null && normalizeRoomName(chore.room) !== chore.room.trim(),
+      );
+
+      if (needsRename.length > 0) {
+        await Promise.all(
+          needsRename.map((chore) =>
+            client
+              .from('chores')
+              .update({ room: normalizeRoomName(chore.room!) })
+              .eq('id', chore.id)
+              .eq('user_id', userId),
+          ),
+        );
+      }
+
+      setChores(
+        rows.map((chore) =>
+          chore.room
+            ? { ...chore, room: normalizeRoomName(chore.room) }
+            : chore,
+        ),
+      );
     }
 
     setLoading(false);
@@ -82,14 +106,16 @@ export function useChores(userId: string | undefined): UseChoresResult {
         const client = requireSupabase();
 
         const dayOfWeek =
-          hasRecurrence && nextDueOn
-            ? deriveDayOfWeekForChore(intervalValue, intervalUnit, nextDueOn)
-            : null;
+          input.day_of_week != null
+            ? input.day_of_week
+            : hasRecurrence && nextDueOn
+              ? deriveDayOfWeekForChore(intervalValue, intervalUnit, nextDueOn)
+              : null;
 
         const insertRow = {
           user_id: userId,
           title: normalizeChoreTitle(input.title),
-          room: input.room?.trim() || null,
+          room: input.room ? normalizeRoomName(input.room) || null : null,
           time_estimate_minutes: input.time_estimate_minutes,
           recurrence_type: isSomeday ? ('someday' as const) : null,
           interval_value: hasRecurrence ? intervalValue : null,
@@ -190,10 +216,13 @@ export function useChores(userId: string | undefined): UseChoresResult {
   );
 
   const updateChore = useCallback(async (id: string, changes: Partial<Chore>): Promise<boolean> => {
-    const payload =
-      changes.title != null
-        ? { ...changes, title: normalizeChoreTitle(changes.title) }
-        : changes;
+    let payload: Partial<Chore> = changes;
+    if (changes.title != null) {
+      payload = { ...payload, title: normalizeChoreTitle(changes.title) };
+    }
+    if (changes.room != null) {
+      payload = { ...payload, room: normalizeRoomName(changes.room) || null };
+    }
 
     const client = requireSupabase();
     const { data, error: updateError } = await client

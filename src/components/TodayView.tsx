@@ -28,6 +28,7 @@ interface TodayViewProps {
   existingRooms?: string[];
   onRememberRoom?: (room: string) => void;
   onNavigateToBacklog?: () => void;
+  hideFab?: boolean;
 }
 
 export function TodayView({
@@ -46,6 +47,7 @@ export function TodayView({
   existingRooms = [],
   onRememberRoom,
   onNavigateToBacklog,
+  hideFab = false,
 }: TodayViewProps) {
   const [focusTimerExpanded, setFocusTimerExpanded] = useState(false);
   const [chooserOpen, setChooserOpen] = useState(false);
@@ -246,7 +248,8 @@ export function TodayView({
         />
       ) : null}
 
-      <div className="relative flex flex-1 flex-col p-4 pb-24 sm:p-6 md:pb-6">
+      <div className="relative flex flex-1 flex-col px-6 pb-28 pt-6 md:pb-6">
+        <h1 className="mb-6 font-display text-[28px] leading-tight text-text-primary">Tasks</h1>
         <TaskQueue
           tasks={tasks}
           completedTasks={todayCompletedTasks}
@@ -273,45 +276,49 @@ export function TodayView({
         ) : null}
       </div>
 
-      <AddTypeChooserSheet
-        open={chooserOpen}
-        onClose={() => setChooserOpen(false)}
-        onSelectTask={() => {
-          setChooserOpen(false);
-          setTaskSheetOpen(true);
-        }}
-        onSelectChore={() => {
-          setChooserOpen(false);
-          setChoreSheetOpen(true);
-        }}
-      />
+      {!hideFab ? (
+        <>
+          <AddTypeChooserSheet
+            open={chooserOpen}
+            onClose={() => setChooserOpen(false)}
+            onSelectTask={() => {
+              setChooserOpen(false);
+              setTaskSheetOpen(true);
+            }}
+            onSelectChore={() => {
+              setChooserOpen(false);
+              setChoreSheetOpen(true);
+            }}
+          />
 
-      <AddTaskBottomSheet
-        key={`task-${sheetKey}`}
-        open={taskSheetOpen}
-        defaultDestination="today"
-        existingCategories={existingCategories}
-        onClose={() => setTaskSheetOpen(false)}
-        onAddToToday={addTodayTask}
-        onAddToBacklog={addBacklogTask}
-      />
+          <AddTaskBottomSheet
+            key={`task-${sheetKey}`}
+            open={taskSheetOpen}
+            defaultDestination="today"
+            existingCategories={existingCategories}
+            onClose={() => setTaskSheetOpen(false)}
+            onAddToToday={addTodayTask}
+            onAddToBacklog={addBacklogTask}
+          />
 
-      {addChore ? (
-        <AddChoreBottomSheet
-          key={`chore-${sheetKey}`}
-          open={choreSheetOpen}
-          existingRooms={existingRooms}
-          onRememberRoom={onRememberRoom}
-          onClose={() => setChoreSheetOpen(false)}
-          onAddChore={addChore}
-          onChoreAdded={onChoreAdded}
-        />
+          {addChore ? (
+            <AddChoreBottomSheet
+              key={`chore-${sheetKey}`}
+              open={choreSheetOpen}
+              existingRooms={existingRooms}
+              onRememberRoom={onRememberRoom}
+              onClose={() => setChoreSheetOpen(false)}
+              onAddChore={addChore}
+              onChoreAdded={onChoreAdded}
+            />
+          ) : null}
+
+          <AddTaskFab
+            onClick={openChooser}
+            hidden={anySheetOpen || (timerActive && focusTimerExpanded)}
+          />
+        </>
       ) : null}
-
-      <AddTaskFab
-        onClick={openChooser}
-        hidden={anySheetOpen || (timerActive && focusTimerExpanded)}
-      />
 
       {undoSnapshot ? (
         <UndoToast

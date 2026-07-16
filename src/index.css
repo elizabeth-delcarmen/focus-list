@@ -1,29 +1,31 @@
-@import "@fontsource/ibm-plex-sans/400.css";
-@import "@fontsource/ibm-plex-sans/500.css";
-@import "@fontsource/ibm-plex-sans/600.css";
-@import "@fontsource/ibm-plex-sans/700.css";
+@import "@fontsource/dm-serif-text/400.css";
+@import "@fontsource/figtree/400.css";
+@import "@fontsource/figtree/500.css";
+@import "@fontsource/figtree/600.css";
+@import "@fontsource/figtree/700.css";
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Figtree", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "DM Serif Text", ui-serif, Georgia, serif;
 
-  /* Neutral chrome — matches holdlist / fintrack blue-grey */
-  --color-bg: #f3f4f7;
+  /* Braindump / Figma rooms-overview */
+  --color-bg: #eef2f7;
   --color-surface: #ffffff;
-  --color-surface-raised: #eceef4;
-  --color-border: #d0d5e0;
-  --color-text-primary: #1c2433;
-  --color-text-muted: #8a96aa;
-  --color-text-faint: #a8b0c0;
+  --color-surface-raised: #e4e9f1;
+  --color-border: #d5dbe6;
+  --color-text-primary: #111111;
+  --color-text-muted: #4b5563;
+  --color-text-faint: #9ca3af;
 
-  /* Brand accent — warm dark slate */
-  --color-accent: #3d3530;
-  --color-accent-soft: #3d353014;
-  --color-accent-bright: #2e2824;
-  --color-accent-border: #3d353045;
+  /* Primary accent — periwinkle */
+  --color-accent: #5c6bf0;
+  --color-accent-soft: #5c6bf014;
+  --color-accent-bright: #4a59e0;
+  --color-accent-border: #5c6bf045;
 
-  --color-runover-bg: #eceef4;
-  --color-runover-border: #d0d5e0;
+  --color-runover-bg: #e4e9f1;
+  --color-runover-border: #d5dbe6;
 
   /* Priority colours */
   --color-urgent: #c0463f;
@@ -38,10 +40,10 @@
   --color-medium-bg: #4f739616;
   --color-medium-border: #4f739645;
   --color-medium-line: #4f739630;
-  --color-low: #938c7c;
-  --color-low-bg: #938c7c16;
-  --color-low-border: #938c7c45;
-  --color-low-line: #938c7c30;
+  --color-low: #6b7280;
+  --color-low-bg: #6b728016;
+  --color-low-border: #6b728045;
+  --color-low-line: #6b728030;
 }
 
 * {
