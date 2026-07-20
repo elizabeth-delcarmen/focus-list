@@ -212,10 +212,6 @@ function localDateToDayNumber(parts: LocalDateParts): number {
   return Math.floor(new Date(parts.year, parts.month - 1, parts.day).getTime() / 86_400_000);
 }
 
-function localDateToISO(parts: LocalDateParts): string {
-  return new Date(parts.year, parts.month - 1, parts.day, 12, 0, 0, 0).toISOString();
-}
-
 function parseDateInput(input: string | Date): LocalDateParts {
   if (typeof input === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input)) {
     const [year, month, day] = input.split('-').map(Number);
@@ -267,14 +263,24 @@ export function getChoreInterval(
   return null;
 }
 
-/** Advance anchor date by one chore interval (used on completion) */
+/** Advance a due date by one chore interval.
+ * `anchor` should be the scheduled due date (YYYY-MM-DD or ISO).
+ * Late/early completion must not pass "today" here or the calendar drifts.
+ */
 export function computeNextDueAt(
   intervalValue: number,
   intervalUnit: IntervalUnit,
   anchor: string | Date,
 ): string {
-  const parts = parseDateInput(anchor);
-  return localDateToISO(addInterval(parts, intervalValue, intervalUnit));
+  const anchorStr =
+    typeof anchor === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(anchor)
+      ? anchor
+      : nextDueAtToDateString(
+          typeof anchor === 'string' ? anchor : anchor.toISOString(),
+        ) ?? getTodayDateString();
+  return dateStringToISO(
+    addIntervalToDateString(anchorStr, intervalValue, intervalUnit),
+  );
 }
 
 export function getDueDatePreview(nextDueOn: string): {

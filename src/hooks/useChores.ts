@@ -6,6 +6,7 @@ import {
   deriveDayOfWeekForChore,
   getChoreInterval,
   isChoreSomeday,
+  nextDueAtToDateString,
   normalizeChoreTitle,
 } from '../lib/choreSchedule';
 import { requireSupabase } from '../lib/supabase';
@@ -180,11 +181,11 @@ export function useChores(userId: string | undefined): UseChoresResult {
       } else {
         changes = { last_completed_at: lastCompletedAt };
         if (interval) {
-          changes.next_due_at = computeNextDueAt(
-            interval.value,
-            interval.unit,
-            lastCompletedAt,
-          );
+          // Always advance from the scheduled due calendar day — never from "today".
+          const dueDateStr = nextDueAtToDateString(existing.next_due_at);
+          changes.next_due_at = dueDateStr
+            ? computeNextDueAt(interval.value, interval.unit, dueDateStr)
+            : computeNextDueAt(interval.value, interval.unit, lastCompletedAt);
         } else {
           changes.next_due_at = null;
         }

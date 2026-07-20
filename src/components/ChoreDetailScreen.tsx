@@ -61,12 +61,19 @@ function buildUpcomingRows(chore: Chore): UpcomingRow[] {
   const interval = getChoreInterval(chore);
 
   if (chore.last_completed_at) {
-    const completedStr =
-      nextDueAtToDateString(chore.last_completed_at) ??
-      chore.last_completed_at.slice(0, 10);
+    // Prefer the due date that was completed (next due minus one interval),
+    // not the day the user tapped done.
+    const nextStr = chore.next_due_at
+      ? nextDueAtToDateString(chore.next_due_at)
+      : null;
+    const completedDueStr =
+      interval && nextStr
+        ? addIntervalToDateString(nextStr, -interval.value, interval.unit)
+        : nextDueAtToDateString(chore.last_completed_at) ??
+          chore.last_completed_at.slice(0, 10);
     rows.push({
-      id: `completed-${completedStr}`,
-      dateLabel: formatLongDate(completedStr),
+      id: `completed-${completedDueStr}`,
+      dateLabel: formatLongDate(completedDueStr),
       statusLabel: 'Completed',
       statusTone: 'completed',
       completed: true,

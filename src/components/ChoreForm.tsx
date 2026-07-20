@@ -163,8 +163,8 @@ export function ChoreForm({
   const [dueOn, setDueOn] = useState(
     () => initial?.next_due_on ?? getTodayDateString(),
   );
-  const [timeEstimate, setTimeEstimate] = useState(
-    initial?.time_estimate_minutes ?? 30,
+  const [timeEstimateInput, setTimeEstimateInput] = useState(
+    String(initial?.time_estimate_minutes ?? 30),
   );
   const [scheduleEnabled, setScheduleEnabled] = useState(
     () => mode === 'edit' && !initial?.is_someday,
@@ -220,6 +220,11 @@ export function ChoreForm({
 
   const canSubmit = Boolean(title.trim());
 
+  const resolvedTimeEstimate = (() => {
+    const parsed = parseInt(timeEstimateInput, 10);
+    return !Number.isNaN(parsed) && parsed > 0 ? parsed : 30;
+  })();
+
   const bumpEvery = (delta: number) => {
     setEveryCount((n) => Math.max(1, Math.min(99, n + delta)));
   };
@@ -248,8 +253,9 @@ export function ChoreForm({
         repeats: true,
         intervalValue: everyCount,
         intervalUnit: 'weeks',
-        dayOfWeek: weekday,
-        nextDueOn: nextDateForWeekday(dueOn, weekday),
+        // Starting On is the source of truth; keep weekday in sync with that date.
+        dayOfWeek: dayOfWeekFromDateString(dueOn),
+        nextDueOn: dueOn,
       };
     }
     if (recurrence === 'monthly') {
@@ -282,7 +288,7 @@ export function ChoreForm({
         const someday: NewChoreInput = {
           title: normalizeChoreTitle(title),
           room: resolvedRoom,
-          time_estimate_minutes: timeEstimate,
+          time_estimate_minutes: resolvedTimeEstimate,
           is_someday: true,
           repeats: false,
           day_of_week: null,
@@ -303,7 +309,7 @@ export function ChoreForm({
       const base: NewChoreInput = {
         title: normalizeChoreTitle(title),
         room: resolvedRoom,
-        time_estimate_minutes: timeEstimate,
+        time_estimate_minutes: resolvedTimeEstimate,
         is_someday: false,
         repeats: resolved.repeats,
         interval_value: resolved.intervalValue,
@@ -468,18 +474,26 @@ export function ChoreForm({
           <div className="flex items-center gap-2 rounded-[12px] bg-[#f7f7fa] px-4 py-4">
             <Clock size={14} className="text-text-muted" aria-hidden />
             <input
-              type="number"
+              type="text"
               name="chore-estimate-minutes"
-              min={1}
               inputMode="numeric"
+              pattern="[0-9]*"
               autoComplete="off"
               data-1p-ignore
               data-lpignore="true"
               data-form-type="other"
-              value={timeEstimate}
+              value={timeEstimateInput}
               onChange={(e) => {
-                const parsed = parseInt(e.target.value, 10);
-                if (!Number.isNaN(parsed) && parsed > 0) setTimeEstimate(parsed);
+                const digitsOnly = e.target.value.replace(/\D/g, '');
+                setTimeEstimateInput(digitsOnly);
+              }}
+              onBlur={() => {
+                const parsed = parseInt(timeEstimateInput, 10);
+                if (Number.isNaN(parsed) || parsed < 1) {
+                  setTimeEstimateInput('30');
+                } else {
+                  setTimeEstimateInput(String(parsed));
+                }
               }}
               className="min-w-0 flex-1 bg-transparent text-[16px] text-text-primary outline-none"
             />
@@ -598,16 +612,19 @@ export function ChoreForm({
                 {WEEKDAYS.map((day) => {
                   const selected = weekday === day.id;
                   return (
-                    <button
-                      key={day.id}
-                      type="button"
-                      onClick={() => setWeekday(day.id)}
-                      className={`flex size-11 items-center justify-center rounded-[20px] text-[12px] font-semibold ${
-                        selected
-                          ? 'bg-[#4e5ddc] text-white'
-                          : 'border border-[#e5e7eb] bg-surface text-text-muted'
-                      }`}
-                    >
+                <button
+                  key={day.id}
+                  type="button"
+                  onClick={() => {
+                    setWeekday(day.id);
+                    setDueOn(nextDateForWeekday(dueOn, day.id));
+                  }}
+                  className={`flex size-11 items-center justify-center rounded-[20px] text-[12px] font-semibold ${
+                    selected
+                      ? 'bg-[#4e5ddc] text-white'
+                      : 'border border-[#e5e7eb] bg-surface text-text-muted'
+                  }`}
+                >
                       {day.label}
                     </button>
                   );
