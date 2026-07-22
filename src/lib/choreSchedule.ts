@@ -31,9 +31,10 @@ export function isChoreOneOff(chore: Chore): boolean {
   return !isChoreSomeday(chore) && getChoreInterval(chore) == null;
 }
 
-/** One-off that was completed and should no longer appear in schedule filters */
+/** Completed once/someday with no further occurrence — hide from active lists */
 export function isChoreDismissed(chore: Chore): boolean {
-  return isChoreOneOff(chore) && !chore.next_due_at;
+  if (chore.next_due_at || getChoreInterval(chore) != null) return false;
+  return Boolean(chore.last_completed_at);
 }
 
 export function dateStringToISO(dateStr: string): string {
@@ -108,8 +109,9 @@ export function deriveDayOfWeekForChore(
   return null;
 }
 
-export function needsChoreRepeatPrompt(chore: Chore): boolean {
-  return isChoreSomeday(chore);
+export function needsChoreRepeatPrompt(_chore: Chore): boolean {
+  // Someday/once tasks mark done directly — no post-complete schedule prompt.
+  return false;
 }
 
 /** Apply recurrence choice after completing a Someday chore */
@@ -120,7 +122,7 @@ export function applyRecurrenceChoiceToChoreChanges(
   if (choice === 'one_off') {
     return {
       last_completed_at: lastCompletedAt,
-      recurrence_type: 'someday',
+      recurrence_type: null,
       interval_value: null,
       interval_unit: null,
       day_of_week: null,

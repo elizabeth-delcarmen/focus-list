@@ -1,4 +1,4 @@
-import { Calendar, Clock, MoreVertical, Play } from 'lucide-react';
+import { Calendar, Check, Clock, MoreVertical, Play } from 'lucide-react';
 import {
   getChoreDueStatus,
   getChoreIntervalLabel,
@@ -21,6 +21,7 @@ export function ChoreCard({
   chore,
   isCompleting = false,
   highlighted = false,
+  onComplete,
   onStart,
   onEdit,
   onDelete,
@@ -99,6 +100,19 @@ export function ChoreCard({
           {pillLabel}
         </span>
         <div className="-mr-2 flex shrink-0 items-center">
+          {onComplete ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onComplete(chore.id);
+              }}
+              className="flex min-h-11 items-center gap-1 px-2 text-[15px] font-medium text-accent transition-opacity hover:opacity-80"
+            >
+              <Check size={14} strokeWidth={2.5} aria-hidden />
+              Done
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={(e) => {

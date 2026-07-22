@@ -8,6 +8,7 @@ import { ChoreRepeatPromptSheet } from './ChoreRepeatPromptSheet';
 import { FocusTimerScreen } from './FocusTimerScreen';
 import { RoomsOverview } from './RoomsOverview';
 import { TaskQueueSkeleton } from './Skeleton';
+import { UndoToast } from './UndoToast';
 import { useChoreRooms } from '../hooks/useChoreRooms';
 import { useTimer } from '../hooks/useTimer';
 import {
@@ -15,12 +16,15 @@ import {
   countChoresInScheduleFilter,
   countOverdueChores,
   deriveDayOfWeekForChore,
+  formatChoreShortDate,
   formatNextDueInterval,
   getChoreDueStatus,
+  getChoreInterval,
   getChoreIntervalLabel,
   getScheduleFilterForChore,
   groupChoresByRoom,
   groupChoresForScheduleView,
+  isChoreDismissed,
   isChoreOverdue,
   isChoreSomeday,
   isChoreVisibleInScheduleFilter,
@@ -110,6 +114,7 @@ export function ChoresView({
   const [completionSubline, setCompletionSubline] = useState<string | undefined>();
   const [forceCompleted, setForceCompleted] = useState(false);
   const [choreUndoSnapshots, setChoreUndoSnapshots] = useState<Record<string, Chore>>({});
+  const [undoToastChoreId, setUndoToastChoreId] = useState<string | null>(null);
   const [repeatPrompt, setRepeatPrompt] = useState<{
     choreId: string;
     actualMinutes?: number;
@@ -141,12 +146,17 @@ export function ChoresView({
 
   const totalOverdueCount = useMemo(() => countOverdueChores(chores), [chores]);
 
+  const activeChores = useMemo(
+    () => chores.filter((c) => !isChoreDismissed(c)),
+    [chores],
+  );
+
   const roomSummaries = useMemo(() => {
     const counts = new Map<string, number>();
     for (const room of existingRooms) {
       counts.set(room, 0);
     }
-    for (const chore of chores) {
+    for (const chore of activeChores) {
       const room = chore.room?.trim();
       if (!room) continue;
       counts.set(room, (counts.get(room) ?? 0) + 1);
@@ -154,7 +164,7 @@ export function ChoresView({
     return [...counts.entries()]
       .map(([name, taskCount]) => ({ name, taskCount }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [chores, existingRooms]);
+  }, [activeChores, existingRooms]);
 
   const filterCounts = useMemo(
     () =>
@@ -166,10 +176,10 @@ export function ChoresView({
 
   const filteredChores = useMemo(() => {
     if (mode === 'rooms' && selectedRoom) {
-      return chores.filter((c) => (c.room?.trim() || 'Unassigned') === selectedRoom);
+      return activeChores.filter((c) => (c.room?.trim() || 'Unassigned') === selectedRoom);
     }
     return chores.filter((c) => isChoreVisibleInScheduleFilter(c, scheduleFilter));
-  }, [chores, scheduleFilter, mode, selectedRoom]);
+  }, [chores, activeChores, scheduleFilter, mode, selectedRoom]);
 
   const groupedChores = useMemo(() => {
     if (mode === 'rooms' && selectedRoom) {
@@ -216,8 +226,8 @@ export function ChoresView({
   useEffect(() => {
     if (isTimerCompleted && activeChore) {
       setCompletionSubline(
-        isChoreSomeday(activeChore)
-          ? 'Logged — no due date'
+        isChoreSomeday(activeChore) || !getChoreInterval(activeChore)
+          ? 'Marked done'
           : `Next due in ${formatNextDueInterval(activeChore)}`,
       );
     }
@@ -243,22 +253,49 @@ export function ChoresView({
       if (completingRef.current) return;
 
       completingRef.current = true;
-      setCompletingChoreId(choreId);
 
       const chore = chores.find((c) => c.id === choreId);
-      if (chore) {
-        setChoreUndoSnapshots((prev) => ({ ...prev, [choreId]: chore }));
+      if (!chore) {
+        completingRef.current = false;
+        return;
       }
 
-      await new Promise((resolve) => setTimeout(resolve, COMPLETE_ANIM_MS));
+      const leavesList =
+        isChoreSomeday(chore) || getChoreInterval(chore) == null;
+
+      setChoreUndoSnapshots((prev) => ({ ...prev, [choreId]: chore }));
+
+      // Only fade out tasks that will leave the list (once / someday).
+      // Recurring tasks stay visible with an updated due date.
+      if (leavesList) {
+        setCompletingChoreId(choreId);
+        await new Promise((resolve) => setTimeout(resolve, COMPLETE_ANIM_MS));
+      }
 
       const wasTiming = timer.activeTaskId === choreId;
 
-      await onCompleteChore(
+      const result = await onCompleteChore(
         choreId,
-        actualMinutes ?? chore?.time_estimate_minutes,
+        actualMinutes ?? chore.time_estimate_minutes,
         recurrenceChoice,
       );
+
+      if (!result) {
+        setCompletingChoreId(null);
+        completingRef.current = false;
+        setChoreUndoSnapshots((prev) => {
+          const next = { ...prev };
+          delete next[choreId];
+          return next;
+        });
+        return;
+      }
+
+      setUndoToastChoreId(choreId);
+
+      if (detailChoreId === choreId) {
+        setDetailChoreId(null);
+      }
 
       if (wasTiming) {
         await timer.complete();
@@ -269,7 +306,7 @@ export function ChoresView({
       setCompletingChoreId(null);
       completingRef.current = false;
     },
-    [timer, chores, onCompleteChore],
+    [timer, chores, onCompleteChore, detailChoreId],
   );
 
   const handleUndoCompleteChore = useCallback(
@@ -283,11 +320,33 @@ export function ChoresView({
           delete next[choreId];
           return next;
         });
+        if (undoToastChoreId === choreId) {
+          setUndoToastChoreId(null);
+        }
       }
       return ok;
     },
-    [choreUndoSnapshots, onUndoCompleteChore],
+    [choreUndoSnapshots, onUndoCompleteChore, undoToastChoreId],
   );
+
+  const undoToastSnapshot = undoToastChoreId
+    ? choreUndoSnapshots[undoToastChoreId]
+    : null;
+  const undoToastLiveChore = undoToastChoreId
+    ? chores.find((c) => c.id === undoToastChoreId)
+    : null;
+  const undoToastTitle = undoToastSnapshot
+    ? normalizeChoreTitle(undoToastSnapshot.title)
+    : '';
+  const undoToastDetail = (() => {
+    if (!undoToastSnapshot) return 'completed';
+    if (isChoreSomeday(undoToastSnapshot) || getChoreInterval(undoToastSnapshot) == null) {
+      return 'completed';
+    }
+    const nextDue = undoToastLiveChore?.next_due_at;
+    if (nextDue) return `done · next ${formatChoreShortDate(nextDue)}`;
+    return 'completed';
+  })();
 
   const handleCompleteChore = useCallback(
     async (
@@ -331,8 +390,8 @@ export function ChoresView({
 
     if (!showCompletedState) {
       setCompletionSubline(
-        isChoreSomeday(activeChore)
-          ? 'Logged — no due date'
+        isChoreSomeday(activeChore) || !getChoreInterval(activeChore)
+          ? 'Marked done'
           : `Next due in ${formatNextDueInterval(activeChore)}`,
       );
       setForceCompleted(true);
@@ -644,6 +703,17 @@ export function ChoresView({
               setCompletionSubline(undefined);
             }
           }}
+        />
+      ) : null}
+
+      {undoToastSnapshot && undoToastChoreId ? (
+        <UndoToast
+          taskTitle={undoToastTitle}
+          detail={undoToastDetail}
+          onUndo={() => {
+            void handleUndoCompleteChore(undoToastChoreId);
+          }}
+          onDismiss={() => setUndoToastChoreId(null)}
         />
       ) : null}
     </>

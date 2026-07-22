@@ -173,11 +173,19 @@ export function useChores(userId: string | undefined): UseChoresResult {
       let changes: Partial<Chore>;
 
       if (isSomeday) {
-        if (!recurrenceChoice) {
-          setError('Choose whether this chore should repeat.');
-          return null;
+        if (recurrenceChoice) {
+          changes = applyRecurrenceChoiceToChoreChanges(recurrenceChoice, lastCompletedAt);
+        } else {
+          // Mark done — leave no further occurrence.
+          changes = {
+            last_completed_at: lastCompletedAt,
+            recurrence_type: null,
+            interval_value: null,
+            interval_unit: null,
+            day_of_week: null,
+            next_due_at: null,
+          };
         }
-        changes = applyRecurrenceChoiceToChoreChanges(recurrenceChoice, lastCompletedAt);
       } else {
         changes = { last_completed_at: lastCompletedAt };
         if (interval) {
@@ -187,6 +195,7 @@ export function useChores(userId: string | undefined): UseChoresResult {
             ? computeNextDueAt(interval.value, interval.unit, dueDateStr)
             : computeNextDueAt(interval.value, interval.unit, lastCompletedAt);
         } else {
+          // Once task: clear due date so it leaves active lists.
           changes.next_due_at = null;
         }
       }
@@ -209,6 +218,7 @@ export function useChores(userId: string | undefined): UseChoresResult {
       }
 
       const updated = data as Chore;
+      setError(null);
       setChores((prev) =>
         prev.map((c) => (c.id === id ? updated : c)),
       );

@@ -238,6 +238,21 @@ export function ChoreDetailScreen({
         </div>
       </div>
 
+      {rows.some((row) => row.canComplete) ? (
+        <button
+          type="button"
+          disabled={markingDone}
+          onClick={() => {
+            const row = rows.find((r) => r.canComplete);
+            if (row) void handleToggleComplete(row);
+          }}
+          className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-accent px-4 text-[15px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+        >
+          <Check size={18} strokeWidth={2.5} aria-hidden />
+          Mark done
+        </button>
+      ) : null}
+
       <div className="mt-6">
         <h2 className="text-[18px] font-bold text-text-primary">Upcoming</h2>
         <div className="mt-3">
