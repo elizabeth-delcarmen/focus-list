@@ -17,10 +17,12 @@ import {
   deriveDayOfWeekForChore,
   formatNextDueInterval,
   getChoreDueStatus,
+  getChoreInterval,
   getChoreIntervalLabel,
   getScheduleFilterForChore,
   groupChoresByRoom,
   groupChoresForScheduleView,
+  isChoreDismissed,
   isChoreOverdue,
   isChoreSomeday,
   isChoreVisibleInScheduleFilter,
@@ -141,12 +143,17 @@ export function ChoresView({
 
   const totalOverdueCount = useMemo(() => countOverdueChores(chores), [chores]);
 
+  const activeChores = useMemo(
+    () => chores.filter((c) => !isChoreDismissed(c)),
+    [chores],
+  );
+
   const roomSummaries = useMemo(() => {
     const counts = new Map<string, number>();
     for (const room of existingRooms) {
       counts.set(room, 0);
     }
-    for (const chore of chores) {
+    for (const chore of activeChores) {
       const room = chore.room?.trim();
       if (!room) continue;
       counts.set(room, (counts.get(room) ?? 0) + 1);
@@ -154,7 +161,7 @@ export function ChoresView({
     return [...counts.entries()]
       .map(([name, taskCount]) => ({ name, taskCount }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [chores, existingRooms]);
+  }, [activeChores, existingRooms]);
 
   const filterCounts = useMemo(
     () =>
@@ -166,10 +173,25 @@ export function ChoresView({
 
   const filteredChores = useMemo(() => {
     if (mode === 'rooms' && selectedRoom) {
-      return chores.filter((c) => (c.room?.trim() || 'Unassigned') === selectedRoom);
+      return activeChores.filter((c) => (c.room?.trim() || 'Unassigned') === selectedRoom);
     }
     return chores.filter((c) => isChoreVisibleInScheduleFilter(c, scheduleFilter));
-  }, [chores, scheduleFilter, mode, selectedRoom]);
+  }, [chores, activeChores, scheduleFilter, mode, selectedRoom]);
+
+  const doneChores = useMemo(() => {
+    const dismissed = chores.filter(isChoreDismissed);
+    const scoped =
+      mode === 'rooms' && selectedRoom
+        ? dismissed.filter((c) => (c.room?.trim() || 'Unassigned') === selectedRoom)
+        : mode === 'schedule'
+          ? dismissed
+          : [];
+    return [...scoped].sort((a, b) => {
+      const aTime = a.last_completed_at ? new Date(a.last_completed_at).getTime() : 0;
+      const bTime = b.last_completed_at ? new Date(b.last_completed_at).getTime() : 0;
+      return bTime - aTime;
+    });
+  }, [chores, mode, selectedRoom]);
 
   const groupedChores = useMemo(() => {
     if (mode === 'rooms' && selectedRoom) {
@@ -234,6 +256,36 @@ export function ChoresView({
     setChoreSheetOpen(true);
   };
 
+  const handleUndoCompleteChore = useCallback(
+    async (choreId: string) => {
+      const snapshot = choreUndoSnapshots[choreId];
+      if (snapshot) {
+        const ok = await onUndoCompleteChore(snapshot);
+        if (ok) {
+          setChoreUndoSnapshots((prev) => {
+            const next = { ...prev };
+            delete next[choreId];
+            return next;
+          });
+        }
+        return ok;
+      }
+
+      // Historical Done item without a session snapshot — reopen as someday.
+      const chore = chores.find((c) => c.id === choreId);
+      if (!chore || !isChoreDismissed(chore)) return false;
+      return onUpdateChore(choreId, {
+        last_completed_at: null,
+        recurrence_type: 'someday',
+        next_due_at: null,
+        interval_value: null,
+        interval_unit: null,
+        day_of_week: null,
+      });
+    },
+    [choreUndoSnapshots, onUndoCompleteChore, onUpdateChore, chores],
+  );
+
   const finishCompleteChore = useCallback(
     async (
       choreId: string,
@@ -243,22 +295,35 @@ export function ChoresView({
       if (completingRef.current) return;
 
       completingRef.current = true;
-      setCompletingChoreId(choreId);
 
       const chore = chores.find((c) => c.id === choreId);
-      if (chore) {
-        setChoreUndoSnapshots((prev) => ({ ...prev, [choreId]: chore }));
+      if (!chore) {
+        completingRef.current = false;
+        return;
       }
 
-      await new Promise((resolve) => setTimeout(resolve, COMPLETE_ANIM_MS));
+      const leavesActiveList =
+        isChoreSomeday(chore) || getChoreInterval(chore) == null;
+
+      setChoreUndoSnapshots((prev) => ({ ...prev, [choreId]: chore }));
+
+      // Fade only when the card will leave the active list (once / someday).
+      if (leavesActiveList) {
+        setCompletingChoreId(choreId);
+        await new Promise((resolve) => setTimeout(resolve, COMPLETE_ANIM_MS));
+      }
 
       const wasTiming = timer.activeTaskId === choreId;
 
       await onCompleteChore(
         choreId,
-        actualMinutes ?? chore?.time_estimate_minutes,
+        actualMinutes ?? chore.time_estimate_minutes,
         recurrenceChoice,
       );
+
+      if (detailChoreId === choreId) {
+        setDetailChoreId(null);
+      }
 
       if (wasTiming) {
         await timer.complete();
@@ -269,24 +334,7 @@ export function ChoresView({
       setCompletingChoreId(null);
       completingRef.current = false;
     },
-    [timer, chores, onCompleteChore],
-  );
-
-  const handleUndoCompleteChore = useCallback(
-    async (choreId: string) => {
-      const snapshot = choreUndoSnapshots[choreId];
-      if (!snapshot) return false;
-      const ok = await onUndoCompleteChore(snapshot);
-      if (ok) {
-        setChoreUndoSnapshots((prev) => {
-          const next = { ...prev };
-          delete next[choreId];
-          return next;
-        });
-      }
-      return ok;
-    },
-    [choreUndoSnapshots, onUndoCompleteChore],
+    [timer, chores, onCompleteChore, detailChoreId],
   );
 
   const handleCompleteChore = useCallback(
@@ -425,16 +473,26 @@ export function ChoresView({
     }
   };
 
-  const renderChore = (chore: Chore) => (
+  const renderChore = (chore: Chore, options?: { completed?: boolean }) => (
     <ChoreCard
       key={chore.id}
       chore={chore}
+      completed={options?.completed}
       isCompleting={chore.id === completingChoreId}
-      onComplete={(id) => void handleCompleteChore(id)}
+      onComplete={
+        options?.completed ? undefined : (id) => void handleCompleteChore(id)
+      }
+      onUndo={
+        options?.completed
+          ? (id) => {
+              void handleUndoCompleteChore(id);
+            }
+          : undefined
+      }
       onStart={(id) => void handleStartChore(id)}
       onEdit={setEditingChoreId}
       onDelete={(id) => void handleDeleteChore(id)}
-      onOpenDetail={setDetailChoreId}
+      onOpenDetail={options?.completed ? undefined : setDetailChoreId}
     />
   );
 
@@ -572,7 +630,7 @@ export function ChoresView({
           <div className="mt-6">
             {loading ? (
               <TaskQueueSkeleton />
-            ) : filteredChores.length === 0 ? (
+            ) : filteredChores.length === 0 && doneChores.length === 0 ? (
               <p className="py-4 text-center text-base text-text-faint md:text-sm">
                 {mode === 'rooms'
                   ? 'No chores in this room'
@@ -580,18 +638,39 @@ export function ChoresView({
               </p>
             ) : (
               <div className="space-y-6">
-                {groupedChores.map((group) => (
-                  <div key={group.label || 'all'}>
-                    {group.label ? (
-                      <p className="mb-3 text-[13px] font-medium uppercase tracking-wide text-text-faint md:text-[11px]">
-                        {group.label}
-                      </p>
-                    ) : null}
+                {filteredChores.length === 0 ? (
+                  <p className="py-2 text-center text-base text-text-faint md:text-sm">
+                    {mode === 'rooms'
+                      ? 'No open chores in this room'
+                      : filteredEmptyMessage}
+                  </p>
+                ) : (
+                  groupedChores.map((group) => (
+                    <div key={group.label || 'all'}>
+                      {group.label ? (
+                        <p className="mb-3 text-[13px] font-medium uppercase tracking-wide text-text-faint md:text-[11px]">
+                          {group.label}
+                        </p>
+                      ) : null}
+                      <div className="space-y-4">
+                        {group.chores.map((chore) => renderChore(chore))}
+                      </div>
+                    </div>
+                  ))
+                )}
+
+                {doneChores.length > 0 ? (
+                  <div>
+                    <p className="mb-3 text-[13px] font-medium uppercase tracking-wide text-text-faint md:text-[11px]">
+                      Done · {doneChores.length}
+                    </p>
                     <div className="space-y-4">
-                      {group.chores.map((chore) => renderChore(chore))}
+                      {doneChores.map((chore) =>
+                        renderChore(chore, { completed: true }),
+                      )}
                     </div>
                   </div>
-                ))}
+                ) : null}
               </div>
             )}
           </div>
